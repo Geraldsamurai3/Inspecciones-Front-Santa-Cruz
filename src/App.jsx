@@ -19,6 +19,9 @@ export default function App() {
       <Route path="/login" element={<LoginPage />} />
       <Route path="/admin/forgot-password" element={<ForgotPasswordPage/>}/>
       <Route path="/admin/reset-password" element={<ResetPasswordPage/>}/>
+
+
+
       {/* 2) Rutas protegidas: TODO lo que empiece con /admin */}
       <Route element={<RequireAuth />}>
         <Route path="/admin" element={<AdminLayout />}>
@@ -26,11 +29,15 @@ export default function App() {
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
 
           {/* Aquí añades tus rutas hijas protegidas */}
+          
           <Route path="/admin/profile" element={<ProfilePage />} />
           <Route path="/admin/users"       element={<UsersPage />}      />
           <Route path="/admin/dashboard"       element={<DashboardPage />}      />
           <Route path="/admin/inspections"       element={<InspectionsPage />}      />
+
           {/* … más rutas protegidas /admin/tuRuta */}
+
+
 
           {/* Cualquier /admin/* no definido vuelve a dashboard */}
           <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />

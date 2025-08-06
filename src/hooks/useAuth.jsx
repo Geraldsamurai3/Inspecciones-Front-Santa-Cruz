@@ -2,12 +2,12 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import { authService } from '../services/authService'
 
-// decodifica JWT sin librerías
+// Decodifica JWT sin librerías
 function decodeJWT(token) {
   try {
     const [, payload] = token.split('.')
-    const str = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
-    return JSON.parse(str)
+    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'))
+    return JSON.parse(json)
   } catch {
     return null
   }
@@ -16,19 +16,22 @@ function decodeJWT(token) {
 const AuthContext = createContext()
 
 export function AuthProvider({ children }) {
-  // 🔹 Inicialización **sincrónica** con lo que haya en localStorage:
+  // Al montar, leemos el token (si hubo uno previo)
   const raw = localStorage.getItem('token')
   const initialUser = raw ? decodeJWT(raw) : null
 
-  const [user, setUser]     = useState(initialUser)
-  const [loading, setLoading] = useState(false) // ya no true al montar
+  const [user, setUser]       = useState(initialUser)
+  const [loading, setLoading] = useState(false)
 
   const login = useCallback(async (email, password) => {
     setLoading(true)
     try {
-      const { access_token } = await authService.login(email, password)
-      localStorage.setItem('token', access_token)
-      const payload = decodeJWT(access_token)
+      // Recibe { access_token } del backend
+      const res = await authService.login(email, password)
+      const token = res.access_token
+      if (!token) throw new Error('No vino access_token del login')
+      localStorage.setItem('token', token)
+      const payload = decodeJWT(token)
       setUser(payload)
       return payload
     } finally {
@@ -40,9 +43,10 @@ export function AuthProvider({ children }) {
     setLoading(true)
     try {
       const res = await authService.register(userData)
-      if (res.access_token) {
-        localStorage.setItem('token', res.access_token)
-        const payload = decodeJWT(res.access_token)
+      const token = res.access_token
+      if (token) {
+        localStorage.setItem('token', token)
+        const payload = decodeJWT(token)
         setUser(payload)
         return payload
       }
@@ -52,16 +56,9 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const logout = useCallback(async () => {
-    setLoading(true)
-    try {
-      await authService.logout()
-    } catch {
-      // ignora errores de logout
-    }
+  const logout = useCallback(() => {
     localStorage.removeItem('token')
     setUser(null)
-    setLoading(false)
   }, [])
 
   return (

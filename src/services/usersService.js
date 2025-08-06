@@ -31,7 +31,6 @@ export const usersService = {
   updateUser: (id, body) => request(`/users/${id}`, { method: 'PATCH', body }),
   toggleBlock: (id) => request(`/users/${id}/block`, { method: 'PATCH' }),
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),
-  getProfile:  ()       => request('/users/me'),
   forgotPassword: (email) => request('/users/forgot-password', { method: 'POST', body: { email } }),
   resetPassword: (token, newPassword) => request('/users/reset-password', { method: 'POST', body: { token, newPassword } }),
 };

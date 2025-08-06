@@ -2,19 +2,19 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import Swal from 'sweetalert2';
-import { Lock } from 'lucide-react';
+import { Lock, Eye, EyeOff } from 'lucide-react';
 import { useUsers } from '../hooks/useUsers';
 
 export default function ResetPasswordPage() {
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token') || '';
+  const token          = searchParams.get('token') || '';
   const [password, setPassword] = useState('');
-  const [confirm, setConfirm] = useState('');
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [confirm,  setConfirm]  = useState('');
+  const [errors,   setErrors]   = useState({});
+  const [loading,  setLoading]  = useState(false);
+  const [showPwd,  setShowPwd]  = useState(false);
+  const [showCfm,  setShowCfm]  = useState(false);
   const navigate = useNavigate();
-
-  // usar useUsers sin que haga GET /users automáticamente
   const { resetPassword } = useUsers({ skipFetchOnMount: true });
 
   useEffect(() => {
@@ -26,19 +26,20 @@ export default function ResetPasswordPage() {
 
   const validate = () => {
     const e = {};
-    if (password.length < 6) e.password = 'Mínimo 6 caracteres';
-    if (confirm !== password) e.confirm = 'No coinciden';
+    const pwdRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/;
+    if (!pwdRegex.test(password)) {
+      e.password = 'Mínimo 8 caracteres, 1 mayúscula, 1 número y 1 símbolo';
+    }
+    if (confirm !== password) {
+      e.confirm = 'Las contraseñas no coinciden';
+    }
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleSubmit = async (e) => {
+  const handleSubmit = async e => {
     e.preventDefault();
     if (!validate()) return;
-    if (!token) {
-      Swal.fire({ icon: 'error', title: 'Token inválido' });
-      return;
-    }
     setLoading(true);
     try {
       await resetPassword(token, password);
@@ -49,7 +50,6 @@ export default function ResetPasswordPage() {
       });
       navigate('/admin/login', { replace: true });
     } catch (err) {
-      console.error('resetPassword error:', err);
       Swal.fire({
         icon: 'error',
         title: 'Error',
@@ -67,21 +67,20 @@ export default function ResetPasswordPage() {
           <div className="bg-blue-100 p-4 rounded-full mb-4">
             <Lock className="h-6 w-6 text-blue-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">
-            Nueva contraseña
-          </h2>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Nueva contraseña</h2>
           <p className="text-sm text-gray-500 text-center">
-            Introduce y confirma tu nueva contraseña.
+            Debe tener ≥8 caracteres, 1 mayúscula, 1 número y 1 símbolo.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
+          {/* Campo Contraseña */}
+          <div className="relative">
             <input
-              type="password"
+              type={showPwd ? 'text' : 'password'}
               placeholder="Contraseña"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={e => setPassword(e.target.value)}
               className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
                 errors.password
                   ? 'border-red-500 focus:ring-red-300'
@@ -89,17 +88,25 @@ export default function ResetPasswordPage() {
               } transition`}
               disabled={loading}
             />
+            <button
+              type="button"
+              onClick={() => setShowPwd(v => !v)}
+              className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+            >
+              {showPwd ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
+            </button>
             {errors.password && (
               <p className="mt-1 text-xs text-red-600">{errors.password}</p>
             )}
           </div>
 
-          <div>
+          {/* Campo Confirmar Contraseña */}
+          <div className="relative">
             <input
-              type="password"
+              type={showCfm ? 'text' : 'password'}
               placeholder="Confirmar contraseña"
               value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
+              onChange={e => setConfirm(e.target.value)}
               className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 ${
                 errors.confirm
                   ? 'border-red-500 focus:ring-red-300'
@@ -107,6 +114,13 @@ export default function ResetPasswordPage() {
               } transition`}
               disabled={loading}
             />
+            <button
+              type="button"
+              onClick={() => setShowCfm(v => !v)}
+              className="absolute inset-y-0 right-3 flex items-center text-gray-500"
+            >
+              {showCfm ? <EyeOff className="h-5 w-5"/> : <Eye className="h-5 w-5"/>}
+            </button>
             {errors.confirm && (
               <p className="mt-1 text-xs text-red-600">{errors.confirm}</p>
             )}

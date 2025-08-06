@@ -46,15 +46,15 @@ export default function LoginPage() {
                 Municipalidad de Santa Cruz
               </span>
             </div>
-            <span className="inline-block text-xs font-medium uppercase bg-gray-200 text-gray-700 rounded-full px-3 py-1">
-              Departamento de Inspecciones
+            <span className="inline-block text-xs font-medium  bg-blue-100 text-blue-800 rounded-full px-3 py-1">
+              Departamento de inspecciones
             </span>
           </div>
 
           {/* Avatar / espacio para foto */}
           <div className="flex justify-center mb-6">
-            <div className="w-24 h-24 rounded-full bg-gray-200 flex items-center justify-center">
-              <User className="h-12 w-12 text-gray-400" />
+            <div className="w-24 h-24 rounded-full bg-blue-100 flex items-center justify-center">
+              <User className="h-12 w-12 text-blue-800" />
             </div>
           </div>
 
