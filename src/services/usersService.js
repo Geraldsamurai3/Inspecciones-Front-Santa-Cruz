@@ -28,6 +28,7 @@ async function request(path, opts = {}) {
 export const usersService = {
   // — Usuarios CRUD —
   getUsers: () => request('/users'),
+  getSystemUsers: () => request('/users/system'), // Agregado para obtener usuarios del sistema
   updateUser: (id, body) => request(`/users/${id}`, { method: 'PATCH', body }),
   toggleBlock: (id) => request(`/users/${id}/block`, { method: 'PATCH' }),
   deleteUser: (id) => request(`/users/${id}`, { method: 'DELETE' }),

@@ -10,6 +10,7 @@ import InspectionsPage from './pages/InspectionsPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
+import InspectionForm from './components/inspections/InspectionForm'
 
 
 export default function App() {
@@ -34,6 +35,8 @@ export default function App() {
           <Route path="/admin/users"       element={<UsersPage />}      />
           <Route path="/admin/dashboard"       element={<DashboardPage />}      />
           <Route path="/admin/inspections"       element={<InspectionsPage />}      />
+          <Route path="/admin/inspectionsform"       element={<InspectionForm />}      />
+
 
           {/* … más rutas protegidas /admin/tuRuta */}
 

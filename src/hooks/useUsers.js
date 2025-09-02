@@ -54,6 +54,15 @@ export function useUsers({ skipFetchOnMount = false } = {}) {
     return await usersService.forgotPassword(email);
   }, []);
 
+  const getSystemUsers = useCallback(async () => {
+    try {
+      return await usersService.getSystemUsers();
+    } catch (err) {
+      setError(err);
+      return [];
+    }
+  }, []);
+
   const resetPassword = useCallback(async (token, newPassword) => {
     return await usersService.resetPassword(token, newPassword);
   }, []);
@@ -63,6 +72,7 @@ export function useUsers({ skipFetchOnMount = false } = {}) {
     loading,
     error,
     fetchUsers,
+    getSystemUsers,
     toggleBlockUser,
     deleteUser,
     updateUser,

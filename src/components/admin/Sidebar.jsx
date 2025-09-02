@@ -30,6 +30,7 @@ export default function Sidebar() {
     { to: '/admin/inspections', label: 'Inspecciones', icon: <ClipboardList size={20}/> },
     { to: '/admin/users',        label: 'Usuarios',     icon: <Users size={20}/> },
     { to: '/admin/settings',     label: 'Ajustes',      icon: <Settings size={20}/> },
+    { to: '/admin/inspectionsform', label: 'Formulario Inspecciones', icon: <ClipboardList size={20}/> },
   ]
 
   return (
