@@ -187,7 +187,14 @@ const baseSchema = z.object({
   procedureNumber: z.string().min(1, "Requerido"),
   applicantType: z.enum(Object.values(ApplicantType)),
   // usuarios del sistema
-  userIds: z.array(z.string()).min(1, "Seleccione al menos un usuario"),
+  userIds: z.string().refine((val) => {
+    try {
+      const arr = JSON.parse(val || "[]");
+      return arr.length > 0;
+    } catch {
+      return false;
+    }
+  }, "Seleccione al menos un usuario"),
 
   // solicitante
   firstName: z.string().optional(),
@@ -309,9 +316,10 @@ export default function InspectionForm() {
   const [currentStep, setCurrentStep] = useState(1);
   const [navBusy, setNavBusy] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [textareaRows, setTextareaRows] = useState(3);
   const totalSteps = 4;
+  const [textareaRows, setTextareaRows] = useState(3);
   const [systemUsers, setSystemUsers] = useState([]);
+  const userIdsRef = useRef();
 
   useEffect(() => {
     let timeoutId;
@@ -356,7 +364,7 @@ export default function InspectionForm() {
       inspectionDate: today,
       procedureNumber: "",
       applicantType: ApplicantType.ANONIMO,
-      userIds: [],
+      userIds: "[]",
 
       // solicitante
       firstName: "", lastName1: "", lastName2: "", physicalId: "",
@@ -407,8 +415,14 @@ export default function InspectionForm() {
       zc_observations: "",
       zc_photos: [],
     },
-    mode: "onBlur", // Cambiado de vuelta para validar al perder foco y por paso
+    mode: "onChange", // Cambiado para actualizar valores inmediatamente
   });
+
+  useEffect(() => {
+    if (userIdsRef.current) {
+      userIdsRef.current.value = watch("userIds") || "[]";
+    }
+  }, [watch("userIds")]);
 
   const dependency = watch("dependency");
   const constructionProcedure = watch("constructionProcedure");
@@ -520,12 +534,22 @@ export default function InspectionForm() {
             systemUsers.map((u) => (
               <Label key={u.id} className="flex items-center gap-3 p-3 sm:p-4 border border-slate-200 rounded-lg sm:rounded-xl hover:border-blue-400 hover:bg-blue-50 cursor-pointer transition-colors">
                 <Checkbox
-                  value={u.id}
-                  checked={(watch("userIds") || []).includes(u.id)}
+                  checked={(JSON.parse(watch("userIds") || "[]")).includes(u.id)}
                   onCheckedChange={(checked) => {
-                    const curr = new Set(watch("userIds") || []);
-                    if (checked) curr.add(u.id); else curr.delete(u.id);
-                    setValue("userIds", Array.from(curr));
+                    const curr = JSON.parse(watch("userIds") || "[]");
+                    if (checked) {
+                      const newArr = [...curr, u.id];
+                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: true, shouldDirty: true });
+                      if (userIdsRef.current) {
+                        userIdsRef.current.value = JSON.stringify(newArr);
+                      }
+                    } else {
+                      const newArr = curr.filter(id => id !== u.id);
+                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: true, shouldDirty: true });
+                      if (userIdsRef.current) {
+                        userIdsRef.current.value = JSON.stringify(newArr);
+                      }
+                    }
                   }}
                   className="flex-shrink-0 data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                 />
@@ -541,17 +565,25 @@ export default function InspectionForm() {
             </div>
           )}
         </div>
+        <input type="hidden" name="userIds" ref={userIdsRef} {...register("userIds")} />
         {errors.userIds && <p className="text-sm text-red-600 mt-1">{errors.userIds.message}</p>}
+
       </div>
 
       <div>
         <Label className="mb-3 flex items-center gap-2 text-sm"><User className="w-4 h-4 text-blue-600" /> Tipo de Solicitante</Label>
-        <RadioGroup value={watch("applicantType")} onValueChange={(v) => setValue("applicantType", v)} className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
           {[ApplicantType.ANONIMO, ApplicantType.FISICA, ApplicantType.JURIDICA].map((opt) => {
             const id = safeId(opt);
             return (
               <div key={opt}>
-                <RadioGroupItem id={id} value={opt} className="peer sr-only" />
+                <input
+                  type="radio"
+                  {...register("applicantType")}
+                  value={opt}
+                  id={id}
+                  className="peer sr-only"
+                />
                 <RadioCard htmlFor={id} value={opt} selected={watch("applicantType") === opt}>
                   <div className="text-blue-700 font-semibold text-sm sm:text-base">
                     {opt === ApplicantType.ANONIMO ? "Anónimo" : opt === ApplicantType.FISICA ? "Persona Física" : "Persona Jurídica"}
@@ -563,7 +595,7 @@ export default function InspectionForm() {
               </div>
             );
           })}
-        </RadioGroup>
+        </div>
         {errors.applicantType && <p className="text-sm text-red-600 mt-1">{errors.applicantType.message}</p>}
       </div>
 
@@ -596,23 +628,31 @@ export default function InspectionForm() {
       <StepHeader icon={MapPin} title="Ubicación" subtitle="Distrito y dirección" step={2} />
       <div>
         <Label className="mb-3 flex items-center gap-2 text-sm"><MapPin className="w-4 h-4 text-blue-600" /> Distrito</Label>
-        <RadioGroup value={watch("district")} onValueChange={(v) => setValue("district", v)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {DISTRICT_OPTIONS.map((d) => {
             const Icon = LUCIDE[d.icon];
             const id = safeId(d.key);
             return (
               <div key={d.key}>
-                <RadioGroupItem id={id} value={d.key} className="peer sr-only" />
-                <RadioCard htmlFor={id} value={d.key} selected={watch("district") === d.key}>
+                <input
+                  type="radio"
+                  {...register("district")}
+                  value={d.key}
+                  id={id}
+                  className="peer sr-only"
+                />
+                <Label htmlFor={id} className={`border rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all block ${
+                  watch("district") === d.key ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-400 hover:bg-blue-50"
+                }`}>
                   <div className="flex items-center gap-2 sm:gap-3">
                     {Icon && <Icon className="w-4 h-4 text-blue-600 shrink-0" />}
                     <span className="text-blue-700 font-semibold text-sm sm:text-base">{d.label}</span>
                   </div>
-                </RadioCard>
+                </Label>
               </div>
             );
           })}
-        </RadioGroup>
+        </div>
         {errors.district && <p className="text-sm text-red-600 mt-1">{errors.district.message}</p>}
       </div>
       <div>
@@ -627,23 +667,31 @@ export default function InspectionForm() {
     <div className="space-y-4 sm:space-y-6">
       <StepHeader icon={Building} title="Dependencias municipales" subtitle="Seleccione un área" step={3} />
       <div>
-        <RadioGroup value={watch("dependency")} onValueChange={(v) => setValue("dependency", v)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {DEPENDENCY_OPTIONS.map((dep) => {
             const Icon = LUCIDE[dep.icon];
             const id = safeId(dep.key);
             return (
               <div key={dep.key}>
-                <RadioGroupItem id={id} value={dep.key} className="peer sr-only" />
-                <RadioCard htmlFor={id} value={dep.key} selected={watch("dependency") === dep.key}>
+                <input
+                  type="radio"
+                  {...register("dependency")}
+                  value={dep.key}
+                  id={id}
+                  className="peer sr-only"
+                />
+                <Label htmlFor={id} className={`border rounded-lg sm:rounded-xl p-3 sm:p-4 cursor-pointer transition-all block ${
+                  watch("dependency") === dep.key ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200" : "border-slate-200 hover:border-blue-400 hover:bg-blue-50"
+                }`}>
                   <div className="flex items-center gap-2 sm:gap-3">
                     {Icon && <Icon className="w-4 h-4 text-blue-600 shrink-0" />}
                     <div className="text-blue-700 font-semibold text-sm sm:text-base">{dep.title}</div>
                   </div>
-                </RadioCard>
+                </Label>
               </div>
             );
           })}
-        </RadioGroup>
+        </div>
         {errors.dependency && <p className="text-sm text-red-600 mt-1">{errors.dependency.message}</p>}
       </div>
     </div>
@@ -679,13 +727,19 @@ export default function InspectionForm() {
       <CardContent className="space-y-6">
         <div>
           <Label className="mb-2 flex items-center gap-2 text-sm"><Hammer className="w-4 h-4 text-blue-600" /> Tipo de trámite</Label>
-          <RadioGroup value={constructionProcedure} onValueChange={(v) => setValue("constructionProcedure", v)} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2 sm:gap-3">
             {CONSTRUCTION_TRAMITES.map((t) => {
               const Icon = LUCIDE[t.icon];
               const id = safeId(t.key);
               return (
                 <div key={t.key}>
-                  <RadioGroupItem id={id} value={t.key} className="peer sr-only" />
+                  <input
+                    type="radio"
+                    {...register("constructionProcedure")}
+                    value={t.key}
+                    id={id}
+                    className="peer sr-only"
+                  />
                   <RadioCard htmlFor={id} value={t.key} selected={constructionProcedure === t.key}>
                     <div className="flex items-center gap-2 sm:gap-3">
                       {Icon && <Icon className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 shrink-0" />}
@@ -695,7 +749,7 @@ export default function InspectionForm() {
                 </div>
               );
             })}
-          </RadioGroup>
+          </div>
           {errors.constructionProcedure && <p className="text-sm text-red-600 mt-1">{errors.constructionProcedure.message}</p>}
         </div>
 
@@ -709,10 +763,11 @@ export default function InspectionForm() {
                   <Label>¿Concuerda con la ubicación?</Label>
                   <div className="flex gap-6 mt-2">
                     <Label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={watch("landUseMatches") === true}
-                        onCheckedChange={(checked) => setValue("landUseMatches", checked ? true : false)}
-                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      <input
+                        type="checkbox"
+                        {...register("landUseMatches")}
+                        checked={watch("landUseMatches")}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                       />
                       Sí
                     </Label>
@@ -730,10 +785,11 @@ export default function InspectionForm() {
                   <Label>¿Se recomienda?</Label>
                   <div className="flex gap-6 mt-2">
                     <Label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={watch("landUseRecommended") === true}
-                        onCheckedChange={(checked) => setValue("landUseRecommended", checked ? true : false)}
-                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      <input
+                        type="checkbox"
+                        {...register("landUseRecommended")}
+                        checked={watch("landUseRecommended")}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                       />
                       Sí
                     </Label>
@@ -784,10 +840,11 @@ export default function InspectionForm() {
                   <Label>¿Construyó?</Label>
                   <div className="flex gap-6 mt-2">
                     <Label className="flex items-center gap-2 cursor-pointer">
-                      <Checkbox
-                        checked={watch("pcConstruyo") === true}
-                        onCheckedChange={(checked) => setValue("pcConstruyo", checked ? true : false)}
-                        className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                      <input
+                        type="checkbox"
+                        {...register("pcConstruyo")}
+                        checked={watch("pcConstruyo")}
+                        className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
                       />
                       Sí
                     </Label>
@@ -837,10 +894,12 @@ export default function InspectionForm() {
                       ["no_iniciada", "Obra no iniciada"]
                     ].map(([v, l]) => (
                       <Label key={v} className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
+                        <input
+                          type="radio"
+                          {...register("roEstado")}
+                          value={v}
                           checked={watch("roEstado") === v}
-                          onCheckedChange={(checked) => setValue("roEstado", checked ? v : undefined)}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                          className="w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500 focus:ring-2"
                         />
                         {l}
                       </Label>
@@ -949,9 +1008,8 @@ export default function InspectionForm() {
                     <Label htmlFor="planType" className="text-sm font-medium">Tipo de plano *</Label>
                     <Input
                       id="planType"
-                      value={parcel.planType ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.planType ?? ""}
+                      onBlur={(e) => {
                         updateParcel('planType', e.target.value);
                       }}
                       className="mt-1"
@@ -963,9 +1021,8 @@ export default function InspectionForm() {
                     <Label htmlFor="planNumber" className="text-sm font-medium">Número de plano *</Label>
                     <Input
                       id="planNumber"
-                      value={parcel.planNumber ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.planNumber ?? ""}
+                      onBlur={(e) => {
                         updateParcel('planNumber', e.target.value);
                       }}
                       className="mt-1"
@@ -977,9 +1034,8 @@ export default function InspectionForm() {
                     <Label htmlFor="area" className="text-sm font-medium">Área (decimal) *</Label>
                     <Input
                       id="area"
-                      value={parcel.area ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.area ?? ""}
+                      onBlur={(e) => {
                         updateParcel('area', e.target.value);
                       }}
                       className="mt-1"
@@ -997,7 +1053,6 @@ export default function InspectionForm() {
                     className="w-full border border-slate-200 rounded-lg p-3 mt-1"
                     value={parcel.mojonType}
                     onChange={(e) => {
-                      if (!e || !e.target) return;
                       updateParcel('mojonType', e.target.value);
                     }}
                     data-parcel-input
@@ -1078,9 +1133,8 @@ export default function InspectionForm() {
                     <Label htmlFor="anchorageMojones" className="text-sm font-medium">Anclaje de mojones *</Label>
                     <Input
                       id="anchorageMojones"
-                      value={parcel.anchorageMojones ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.anchorageMojones ?? ""}
+                      onBlur={(e) => {
                         updateParcel('anchorageMojones', e.target.value);
                       }}
                       className="mt-1"
@@ -1092,9 +1146,8 @@ export default function InspectionForm() {
                     <Label htmlFor="topography" className="text-sm font-medium">Topografía *</Label>
                     <Input
                       id="topography"
-                      value={parcel.topography ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.topography ?? ""}
+                      onBlur={(e) => {
                         updateParcel('topography', e.target.value);
                       }}
                       className="mt-1"
@@ -1110,9 +1163,8 @@ export default function InspectionForm() {
                     <Label htmlFor="topographyOther" className="text-sm font-medium">Topografía (otra)</Label>
                     <Input
                       id="topographyOther"
-                      value={parcel.topographyOther ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.topographyOther ?? ""}
+                      onBlur={(e) => {
                         updateParcel('topographyOther', e.target.value);
                       }}
                       className="mt-1"
@@ -1124,9 +1176,8 @@ export default function InspectionForm() {
                     <Label htmlFor="fenceTypes" className="text-sm font-medium">Tipos de cercas (coma)</Label>
                     <Input
                       id="fenceTypes"
-                      value={parcel.fenceTypes ?? ""}
-                      onChange={(e) => {
-                        if (!e || !e.target) return;
+                      defaultValue={parcel.fenceTypes ?? ""}
+                      onBlur={(e) => {
                         updateParcel('fenceTypes', e.target.value);
                       }}
                       className="mt-1"
@@ -1234,9 +1285,8 @@ export default function InspectionForm() {
                   <Label htmlFor="rightOfWayWidth" className="text-sm font-medium">Ancho de servidumbre</Label>
                   <Input
                     id="rightOfWayWidth"
-                    value={parcel.rightOfWayWidth ?? ""}
-                    onChange={(e) => {
-                      if (!e || !e.target) return;
+                    defaultValue={parcel.rightOfWayWidth ?? ""}
+                    onBlur={(e) => {
                       updateParcel('rightOfWayWidth', e.target.value);
                     }}
                     className="mt-1"
@@ -1395,33 +1445,47 @@ export default function InspectionForm() {
         parcels: [{
           planType: parcel.planType,
           planNumber: parcel.planNumber,
-          area: parcel.area ? Number(parcel.area) : undefined,
+          area: parcel.area ? String(parcel.area) : "0",
           mojonType: parcel.mojonType,
           planComplies: parcel.planComplies,
           respectsBoundary: parcel.respectsBoundary,
           anchorageMojones: parcel.anchorageMojones,
           topography: parcel.topography,
-          topographyOther: parcel.topographyOther || null,
+          topographyOther: parcel.topographyOther || "",
           fenceTypes: parcel.fenceTypes,
           fencesInvadePublic: parcel.fencesInvadePublic,
           roadHasPublicAccess: parcel.roadHasPublicAccess,
-          roadDescription: parcel.roadDescription || null,
-          roadLimitations: parcel.roadLimitations || null,
+          roadDescription: parcel.roadDescription || "",
+          roadLimitations: parcel.roadLimitations || "",
           roadMatchesPlan: parcel.roadMatchesPlan,
-          rightOfWayWidth: parcel.rightOfWayWidth || null,
+          rightOfWayWidth: parcel.rightOfWayWidth || "",
         }],
       } : undefined;
+
+      // Parse and normalize userIds
+      const parsedUserIds = (() => {
+        try {
+          return JSON.parse(values.userIds || "[]");
+        } catch {
+          return [];
+        }
+      })();
+
+      const inspectorIdsToSend = parsedUserIds.map((id) => {
+        if (typeof id === "string" && id !== "" && /^-?\d+$/.test(id)) return Number(id);
+        return id;
+      });
 
       const payload = {
         inspectionDate: values.inspectionDate,
         procedureNumber: values.procedureNumber,
-        userIds: values.userIds,
+        inspectorIds: inspectorIdsToSend,
         ...applicant,
-        location,
+        location: values.exactAddress.trim() ? { district: values.district, exactAddress: values.exactAddress } : undefined,
         dependency: values.dependency,
         mayorOffice,
         constructions,
-        concession: zmtConcession,
+        zmtConcession,
       };
 
       const photosBySection = {
@@ -1439,7 +1503,7 @@ export default function InspectionForm() {
         inspectionDate: today,
         procedureNumber: "",
         applicantType: ApplicantType.ANONIMO,
-        userIds: [],
+        userIds: "[]",
         firstName: "", lastName1: "", lastName2: "", physicalId: "",
         companyName: "", legalId: "",
         district: District.SantaCruz,

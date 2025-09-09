@@ -13,6 +13,7 @@ import {
   Settings,
   LogOut,
   User,
+  FileText,
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -28,6 +29,7 @@ export default function Sidebar() {
   const menuItems = [
     { to: '/admin/dashboard',   label: 'Dashboard',    icon: <Home size={20}/> },
     { to: '/admin/inspections', label: 'Inspecciones', icon: <ClipboardList size={20}/> },
+    { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <FileText size={20}/> },
     { to: '/admin/users',        label: 'Usuarios',     icon: <Users size={20}/> },
     { to: '/admin/settings',     label: 'Ajustes',      icon: <Settings size={20}/> },
     { to: '/admin/inspectionsform', label: 'Formulario Inspecciones', icon: <ClipboardList size={20}/> },

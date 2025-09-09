@@ -7,6 +7,7 @@ import UsersPage from './pages/UsersPage.jsx'
 import LoginPage from './components/auth/LoginPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import InspectionsPage from './pages/InspectionsPage.jsx'
+import InspectionManagementPage from './pages/InspectionManagementPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/admin/users"       element={<UsersPage />}      />
           <Route path="/admin/dashboard"       element={<DashboardPage />}      />
           <Route path="/admin/inspections"       element={<InspectionsPage />}      />
+          <Route path="/admin/inspections-management" element={<InspectionManagementPage />} />
           <Route path="/admin/inspectionsform"       element={<InspectionForm />}      />
 
 

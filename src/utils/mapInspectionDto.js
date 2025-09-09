@@ -26,16 +26,17 @@ function extractInspectorIds(userIds = []) {
     .map((v) => Number(v));
 }
 
+
+
 export function mapInspectionDto(values = {}) {
   const {
     inspectionDate,
     procedureNumber,
-    userIds = [],
+    inspectorIds = [],
     applicantType,
     individualRequest,
     legalEntityRequest,
-    district,
-    exactAddress,
+    location,
     dependency,
     mayorOffice,
     constructions,
@@ -43,16 +44,26 @@ export function mapInspectionDto(values = {}) {
   } = values;
 
   const applicant = normalizeApplicantType(applicantType);
-  const inspectorIds = extractInspectorIds(userIds);
+  const normalizedInspectorIds = extractInspectorIds(inspectorIds);
 
   const dto = {
-    inspectionDate: toDMY(inspectionDate),
+    inspectionDate: inspectionDate, // Send as-is, let backend handle the transformation
     procedureNumber: nullIfEmpty(procedureNumber),
     applicantType: applicant,
-    location: { district, exactAddress },
+    dependency: nullIfEmpty(dependency),
   };
 
-  if (inspectorIds.length) dto.inspectorIds = inspectorIds;
+
+
+  if (normalizedInspectorIds.length) dto.inspectorIds = normalizedInspectorIds;
+  
+  // Location
+  if (location && location.district && location.exactAddress) {
+    dto.location = {
+      district: location.district,
+      exactAddress: nullIfEmpty(location.exactAddress),
+    };
+  }
 
   // Solicitante
   if (applicant === "Persona Física" && individualRequest) {
@@ -69,7 +80,7 @@ export function mapInspectionDto(values = {}) {
     };
   }
 
-  // Dependencias
+  // Mayor Office
   if (dependency === "MayorOffice" && mayorOffice) {
     dto.mayorOffice = {
       procedureType: nullIfEmpty(mayorOffice.procedureType),
@@ -77,8 +88,10 @@ export function mapInspectionDto(values = {}) {
     };
   }
 
+  // Constructions - map to specific DTO fields based on procedure type
   if (dependency === "Constructions" && constructions) {
     const { procedure, data } = constructions;
+    
     if (procedure === "UsoSuelo" && data) {
       dto.landUse = {
         requestedUse: nullIfEmpty(data.landUseRequested),
@@ -87,12 +100,14 @@ export function mapInspectionDto(values = {}) {
         observations: nullIfEmpty(data.observations),
       };
     }
+    
     if (procedure === "Antiguedad" && data) {
       dto.antiquity = {
         propertyNumber: nullIfEmpty(data.propertyNumber),
         estimatedAntiquity: nullIfEmpty(data.estimatedAge),
       };
     }
+    
     if (procedure === "AnulacionPC" && data) {
       dto.pcCancellation = {
         contractNumber: nullIfEmpty(data.contractNumber),
@@ -101,31 +116,38 @@ export function mapInspectionDto(values = {}) {
         observations: nullIfEmpty(data.observations),
       };
     }
+    
     if (procedure === "InspeccionGeneral" && data) {
       dto.generalInspection = {
         propertyNumber: nullIfEmpty(data.propertyNumber),
         observations: nullIfEmpty(data.observations),
       };
     }
+    
     if (procedure === "RecibidoObra" && data) {
       dto.workReceipt = {
-        visitDate: toDMY(data.visitedAt),
+        visitDate: data.visitedAt,
         state: data.status,
       };
     }
   }
 
+  // Maritime Zone Concession
   if (dependency === "MaritimeZone" && zmtConcession) {
     dto.concession = {
       fileNumber: nullIfEmpty(zmtConcession.fileNumber),
       concessionType: nullIfEmpty(zmtConcession.concessionType),
-      grantedAt: toDMY(zmtConcession.grantedAt),
-      expiresAt: toDMY(zmtConcession.expiresAt),
+      grantedAt: zmtConcession.grantedAt,
+      expiresAt: zmtConcession.expiresAt,
       observations: nullIfEmpty(zmtConcession.observations),
-      parcels: zmtConcession.parcels?.map((p) => ({
+    };
+    
+    // Map parcels if they exist
+    if (zmtConcession.parcels && zmtConcession.parcels.length > 0) {
+      dto.concessionParcels = zmtConcession.parcels.map((p) => ({
         planType: nullIfEmpty(p.planType),
         planNumber: nullIfEmpty(p.planNumber),
-        area: p.area ? Number(p.area) : null,
+        area: p.area ? String(p.area) : "0",
         mojonType: nullIfEmpty(p.mojonType),
         planComplies: p.planComplies === "si",
         respectsBoundary: p.respectsBoundary === "si",
@@ -135,12 +157,12 @@ export function mapInspectionDto(values = {}) {
         fenceTypes: p.fenceTypes ? p.fenceTypes.split(",").map((s) => s.trim()).filter(Boolean) : [],
         fencesInvadePublic: p.fencesInvadePublic === "si",
         roadHasPublicAccess: p.roadHasPublicAccess === "si",
-        roadDescription: nullIfEmpty(p.roadDescription),
-        roadLimitations: nullIfEmpty(p.roadLimitations),
+        roadDescription: p.roadDescription || "",
+        roadLimitations: p.roadLimitations || "",
         roadMatchesPlan: p.roadMatchesPlan === "si",
-        rightOfWayWidth: nullIfEmpty(p.rightOfWayWidth),
-      })) || [],
-    };
+        rightOfWayWidth: p.rightOfWayWidth || "",
+      }));
+    }
   }
 
   return cleanEmpty(dto) || {};

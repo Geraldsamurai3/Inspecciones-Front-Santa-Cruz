@@ -12,7 +12,7 @@ export const District = Object.freeze({
   Cartagena: "Cartagena",
   Cuajiniquil: "Cuajiniquil",
   Diria: "Diria",
-  Cabovelas: "Cabovelas",
+  Cabovelas: "Cabo velas",
   Tamarindo: "Tamarindo",
 });
 
