@@ -92,6 +92,12 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
     return updated;
   }, [fetchInspections]);
 
+  const updateInspectionStatus = useCallback(async (id, status) => {
+    const updated = await inspectionsService.updateInspectionStatus(id, status);
+    await fetchInspections(initialParamsRef.current);
+    return updated;
+  }, [fetchInspections]);
+
   const deleteInspection = useCallback(async (id) => {
     await inspectionsService.deleteInspection(id);
     await fetchInspections(initialParamsRef.current);
@@ -106,6 +112,7 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
     getInspection,
     createInspectionFromForm,
     updateInspection,
+    updateInspectionStatus,
     deleteInspection,
   };
 }

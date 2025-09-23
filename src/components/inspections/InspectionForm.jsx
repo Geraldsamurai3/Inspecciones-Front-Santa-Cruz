@@ -347,6 +347,44 @@ export default function InspectionForm() {
   });
   const [photoErrors, setPhotoErrors] = useState({});
 
+  // Helper para validar fotos requeridas según dependencia/trámite
+  const getRequiredPhotoKeys = (vals) => {
+    const req = [];
+    if (vals.dependency === Dependency.MayorOffice) {
+      req.push('mo1','mo2','mo3');
+    }
+    if (vals.dependency === Dependency.Constructions) {
+      if (vals.constructionProcedure === ConstructionProcedure.Antiguedad) req.push('antiguedad1','antiguedad2','antiguedad3');
+      if (vals.constructionProcedure === ConstructionProcedure.AnulacionPC) req.push('pc1');
+      if (vals.constructionProcedure === ConstructionProcedure.InspeccionGeneral) req.push('ig1');
+      if (vals.constructionProcedure === ConstructionProcedure.RecibidoObra) req.push('ro1');
+    }
+    if (vals.dependency === Dependency.MaritimeZone) {
+      req.push('zmt1','zmt2','zmt3');
+    }
+    return req;
+  };
+
+  const validateRequiredPhotos = (vals) => {
+    const required = getRequiredPhotoKeys(vals);
+    if (!required.length) return true;
+    const missing = required.filter((k) => !photos[k]);
+    if (missing.length === 0) return true;
+    // Marcar errores inline
+    setPhotoErrors((prev) => {
+      const next = { ...prev };
+      missing.forEach((k) => { next[k] = 'Este campo es requerido.'; });
+      return next;
+    });
+    // Enfocar/scroll al primero
+    const first = missing[0];
+    const el = document.getElementById(`photo-${first}`);
+    if (el && typeof el.scrollIntoView === 'function') {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return false;
+  };
+
   // Fotos como URLs (MayorOffice, ZMT)
   // MayorOffice photos ahora usan campos de subida (mo1, mo2, mo3)
   // ZMT photos ahora usan campos de subida (zmt1, zmt2, zmt3)
@@ -358,8 +396,13 @@ export default function InspectionForm() {
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
-  const { register, handleSubmit, watch, setValue, trigger, reset, formState: { errors } } = useForm({
+  const { register, handleSubmit, watch, setValue, trigger, reset, formState: { errors, touchedFields } } = useForm({
     resolver: zodResolver(formSchema),
+    mode: 'onBlur',
+    reValidateMode: 'onChange',
+    criteriaMode: 'firstError',
+    delayError: 300,
+    shouldUnregister: false,
     defaultValues: {
       inspectionDate: today,
       procedureNumber: "",
@@ -415,7 +458,6 @@ export default function InspectionForm() {
       zc_observations: "",
       zc_photos: [],
     },
-    mode: "onChange", // Cambiado para actualizar valores inmediatamente
   });
 
   useEffect(() => {
@@ -427,6 +469,9 @@ export default function InspectionForm() {
   const dependency = watch("dependency");
   const constructionProcedure = watch("constructionProcedure");
   const applicantType = watch("applicantType");
+
+  // Mostrar errores sólo tras intentar avanzar o si el campo fue tocado
+  const [showStepErrors, setShowStepErrors] = useState({ 1: false, 2: false, 3: false, 4: false });
 
   // Función helper para manejar cambios en parcelas de manera segura
   const updateParcel = useCallback((field, value) => {
@@ -449,51 +494,97 @@ export default function InspectionForm() {
   }, [users, usersLoading]);
 
   const validateStep = async (step) => {
-    if (step === 1) return trigger(["inspectionDate", "procedureNumber", "applicantType", "userIds", ...(applicantType === ApplicantType.FISICA ? ["firstName", "lastName1", "physicalId"] : []), ...(applicantType === ApplicantType.JURIDICA ? ["companyName", "legalId"] : [])]);
-    if (step === 2) return trigger(["district", "exactAddress"]);
-    if (step === 3) return trigger(["dependency"]);
+    if (step === 1) return trigger(["inspectionDate", "procedureNumber", "applicantType", "userIds", ...(applicantType === ApplicantType.FISICA ? ["firstName", "lastName1", "physicalId"] : []), ...(applicantType === ApplicantType.JURIDICA ? ["companyName", "legalId"] : [])], { shouldFocus: true });
+    if (step === 2) return trigger(["district", "exactAddress"], { shouldFocus: true });
+    if (step === 3) return trigger(["dependency"], { shouldFocus: true });
     if (step === 4) {
-      if (dependency === Dependency.MayorOffice) return trigger(["mo_procedureType"]);
-      if (dependency === Dependency.Constructions) {
-        const ok = await trigger(["constructionProcedure"]);
+      let ok = true;
+      if (dependency === Dependency.MayorOffice) {
+        ok = await trigger(["mo_procedureType"], { shouldFocus: true });
+      } else if (dependency === Dependency.Constructions) {
+        ok = await trigger(["constructionProcedure"], { shouldFocus: true });
         if (!ok) return false;
-        if (constructionProcedure === ConstructionProcedure.UsoSuelo) return trigger(["landUseRequested", "landUseMatches", "landUseRecommended"]);
-        if (constructionProcedure === ConstructionProcedure.Antiguedad) return trigger(["antiguedadNumeroFinca", "antiguedadAprox"]);
-        if (constructionProcedure === ConstructionProcedure.AnulacionPC) return trigger(["pcNumeroContrato", "pcNumero", "pcConstruyo"]);
-        if (constructionProcedure === ConstructionProcedure.InspeccionGeneral) return trigger(["igNumeroFinca"]);
-        if (constructionProcedure === ConstructionProcedure.RecibidoObra) return trigger(["roFechaVisita", "roEstado"]);
+        if (constructionProcedure === ConstructionProcedure.UsoSuelo) ok = await trigger(["landUseRequested", "landUseMatches", "landUseRecommended"], { shouldFocus: true });
+        if (constructionProcedure === ConstructionProcedure.Antiguedad) ok = await trigger(["antiguedadNumeroFinca", "antiguedadAprox"], { shouldFocus: true });
+        if (constructionProcedure === ConstructionProcedure.AnulacionPC) ok = await trigger(["pcNumeroContrato", "pcNumero", "pcConstruyo"], { shouldFocus: true });
+        if (constructionProcedure === ConstructionProcedure.InspeccionGeneral) ok = await trigger(["igNumeroFinca"], { shouldFocus: true });
+        if (constructionProcedure === ConstructionProcedure.RecibidoObra) ok = await trigger(["roFechaVisita", "roEstado"], { shouldFocus: true });
+      } else if (dependency === Dependency.MaritimeZone) {
+        ok = await trigger(["zc_fileNumber", "zc_concessionType", "zc_grantedAt"], { shouldFocus: true });
       }
-      if (dependency === Dependency.MaritimeZone) return trigger(["zc_fileNumber", "zc_concessionType", "zc_grantedAt"]);
-      return true;
+      if (!ok) return false;
+      // Validar fotos requeridas para la dependencia/trámite
+      const photosOk = validateRequiredPhotos(watch());
+      return photosOk;
     }
     return true;
   };
 
-  const nextStep = async () => { if (navBusy) return; setNavBusy(true); const ok = await validateStep(currentStep); if (ok) setCurrentStep((s) => Math.min(totalSteps, s + 1)); setNavBusy(false); };
+  const nextStep = async () => {
+    if (navBusy) return;
+    setNavBusy(true);
+    const ok = await validateStep(currentStep);
+    if (ok) {
+      setShowStepErrors((prev) => ({ ...prev, [currentStep]: false }));
+      setCurrentStep((s) => Math.min(totalSteps, s + 1));
+    } else {
+      setShowStepErrors((prev) => ({ ...prev, [currentStep]: true }));
+    }
+    setNavBusy(false);
+  };
   const prevStep = () => { if (navBusy) return; setCurrentStep((s) => Math.max(1, s - 1)); };
 
   /* ---------------------------- UI de progreso --------------------------- */
-  const ProgressWizard = () => (
-    <div className="bg-slate-50 px-4 sm:px-6 lg:px-8 py-4 sm:py-5 border-b border-slate-200">
-      <div className="relative">
-        <div className="absolute top-1/2 left-0 right-0 h-1 bg-slate-200 -translate-y-1/2 rounded" />
-        <div className="absolute top-1/2 left-0 h-1 bg-blue-600 -translate-y-1/2 rounded transition-all" style={{ width: `${((currentStep - 1) / (totalSteps - 1)) * 100}%` }} />
-        <div className="relative z-10 grid grid-cols-4 gap-1 sm:gap-2">
-          {[User, MapPin, Building, ClipboardList].map((Icon, idx) => {
-            const step = idx + 1; const active = step === currentStep; const done = step < currentStep;
-            return (
-              <div key={step} className="flex flex-col items-center gap-1 sm:gap-2">
-                <div className={`w-8 h-8 sm:w-10 sm:h-10 rounded-full flex items-center justify-center border-2 shadow-sm ${done ? "bg-green-500 border-green-500 text-white" : active ? "bg-blue-600 border-blue-600 text-white" : "bg-white border-slate-300 text-slate-400"}`}>
-                  <Icon className="w-3 h-3 sm:w-4 sm:h-4" />
+  const ProgressWizard = () => {
+    const steps = [
+      { icon: User, label: 'Solicitante' },
+      { icon: MapPin, label: 'Ubicación' },
+      { icon: Building, label: 'Dependencia' },
+      { icon: ClipboardList, label: 'Detalles' },
+    ];
+    const progress = ((currentStep - 1) / (totalSteps - 1)) * 100;
+    return (
+      <div className="bg-slate-50/80 backdrop-blur px-4 sm:px-6 lg:px-8 py-5 border-b border-slate-200">
+        <div className="relative h-20">
+          {/* Track */}
+          <div className="absolute top-1/2 left-0 right-0 h-1.5 -translate-y-1/2 rounded-full bg-slate-200" />
+          {/* Progress */}
+          <div
+            className="absolute top-1/2 left-0 h-1.5 -translate-y-1/2 rounded-full bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 shadow-sm transition-[width] duration-500 ease-out"
+            style={{ width: `${progress}%` }}
+          />
+          {/* Steps - full width */}
+          <div className="relative z-10 grid grid-cols-4 h-full">
+            {steps.map(({ icon: Icon, label }, idx) => {
+              const step = idx + 1;
+              const done = step < currentStep;
+              const active = step === currentStep;
+              return (
+                <div key={step} className="relative">
+                  {/* Circle centered on the line */}
+                  <div
+                    aria-current={active ? 'step' : undefined}
+                    className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center ring-2 shadow-sm transition-all
+                    ${done ? 'bg-emerald-500 text-white ring-emerald-300 shadow-md' : ''}
+                    ${active ? 'bg-blue-600 text-white ring-blue-300 shadow-lg' : ''}
+                    ${!done && !active ? 'bg-white text-slate-400 ring-slate-300' : ''}`}
+                  >
+                    {/* Glow pulse for active step */}
+                    {active && (
+                      <span className="pointer-events-none absolute inset-0 rounded-full ring-4 ring-blue-300/40 animate-ping" />
+                    )}
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  {/* Label below the line */}
+                  <span className="absolute left-1/2 -translate-x-1/2 top-[calc(50%+1.4rem)] text-[10px] sm:text-xs text-slate-600 font-medium select-none">{label}</span>
                 </div>
-                <span className="text-xs text-slate-500 hidden sm:block">{step}</span>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const StepHeader = ({ icon: Icon, title, subtitle, step }) => (
     <div className="flex items-start gap-3 sm:gap-4 pb-4">
@@ -517,13 +608,13 @@ export default function InspectionForm() {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
         <div>
           <Label className="mb-2 flex items-center gap-2 text-sm"><Calendar className="w-4 h-4 text-blue-600" /> Fecha de Inspección</Label>
-          <Input type="date" {...register("inspectionDate")} readOnly aria-invalid={!!errors.inspectionDate} className="w-full" />
-          {errors.inspectionDate && <p className="text-sm text-red-600 mt-1">{errors.inspectionDate.message}</p>}
+          <Input type="date" {...register("inspectionDate")} readOnly aria-invalid={!!errors.inspectionDate && (touchedFields.inspectionDate || showStepErrors[1])} className="w-full" />
+          {errors.inspectionDate && (touchedFields.inspectionDate || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.inspectionDate.message}</p>}
         </div>
         <div>
           <Label className="mb-2 flex items-center gap-2 text-sm"><Hash className="w-4 h-4 text-blue-600" /> Número de Trámite</Label>
-          <Input placeholder="INS-0001" {...register("procedureNumber")} aria-invalid={!!errors.procedureNumber} className="w-full" />
-          {errors.procedureNumber && <p className="text-sm text-red-600 mt-1">{errors.procedureNumber.message}</p>}
+          <Input placeholder="INS-0001" {...register("procedureNumber")} aria-invalid={!!errors.procedureNumber && (touchedFields.procedureNumber || showStepErrors[1])} className="w-full" />
+          {errors.procedureNumber && (touchedFields.procedureNumber || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.procedureNumber.message}</p>}
         </div>
       </div>
 
@@ -539,13 +630,13 @@ export default function InspectionForm() {
                     const curr = JSON.parse(watch("userIds") || "[]");
                     if (checked) {
                       const newArr = [...curr, u.id];
-                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: true, shouldDirty: true });
+                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: false, shouldDirty: true });
                       if (userIdsRef.current) {
                         userIdsRef.current.value = JSON.stringify(newArr);
                       }
                     } else {
                       const newArr = curr.filter(id => id !== u.id);
-                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: true, shouldDirty: true });
+                      setValue("userIds", JSON.stringify(newArr), { shouldValidate: false, shouldDirty: true });
                       if (userIdsRef.current) {
                         userIdsRef.current.value = JSON.stringify(newArr);
                       }
@@ -566,7 +657,7 @@ export default function InspectionForm() {
           )}
         </div>
         <input type="hidden" name="userIds" ref={userIdsRef} {...register("userIds")} />
-        {errors.userIds && <p className="text-sm text-red-600 mt-1">{errors.userIds.message}</p>}
+  {errors.userIds && (showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.userIds.message}</p>}
 
       </div>
 
@@ -596,17 +687,32 @@ export default function InspectionForm() {
             );
           })}
         </div>
-        {errors.applicantType && <p className="text-sm text-red-600 mt-1">{errors.applicantType.message}</p>}
+  {errors.applicantType && (touchedFields.applicantType || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.applicantType.message}</p>}
       </div>
 
       {applicantType === ApplicantType.FISICA && (
         <Card key="fisica" className="mt-4 border-slate-200">
           <CardHeader className="pb-3"><CardTitle className="text-base text-blue-700">Datos de Persona Física</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div><Label className="text-sm">Nombre</Label><Input {...register("firstName")} aria-invalid={!!errors.firstName} className="w-full" /></div>
-            <div><Label className="text-sm">Primer Apellido</Label><Input {...register("lastName1")} aria-invalid={!!errors.lastName1} className="w-full" /></div>
-            <div><Label className="text-sm">Segundo Apellido</Label><Input {...register("lastName2")} className="w-full" /></div>
-            <div><Label className="text-sm">Cédula</Label><Input {...register("physicalId")} aria-invalid={!!errors.physicalId} className="w-full" /></div>
+            <div>
+              <Label className="text-sm">Nombre</Label>
+              <Input {...register("firstName")} aria-invalid={!!errors.firstName && (touchedFields.firstName || showStepErrors[1])} className="w-full" />
+              {errors.firstName && (touchedFields.firstName || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.firstName.message}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">Primer Apellido</Label>
+              <Input {...register("lastName1")} aria-invalid={!!errors.lastName1 && (touchedFields.lastName1 || showStepErrors[1])} className="w-full" />
+              {errors.lastName1 && (touchedFields.lastName1 || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.lastName1.message}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">Segundo Apellido</Label>
+              <Input {...register("lastName2")} className="w-full" />
+            </div>
+            <div>
+              <Label className="text-sm">Cédula</Label>
+              <Input {...register("physicalId")} aria-invalid={!!errors.physicalId && (touchedFields.physicalId || showStepErrors[1])} className="w-full" />
+              {errors.physicalId && (touchedFields.physicalId || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.physicalId.message}</p>}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -615,8 +721,16 @@ export default function InspectionForm() {
         <Card key="juridica" className="mt-4 border-slate-200">
           <CardHeader className="pb-3"><CardTitle className="text-base text-blue-700">Datos de Persona Jurídica</CardTitle></CardHeader>
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-            <div><Label className="text-sm">Razón Social</Label><Input {...register("companyName")} aria-invalid={!!errors.companyName} className="w-full" /></div>
-            <div><Label className="text-sm">Cédula Jurídica</Label><Input {...register("legalId")} aria-invalid={!!errors.legalId} className="w-full" /></div>
+            <div>
+              <Label className="text-sm">Razón Social</Label>
+              <Input {...register("companyName")} aria-invalid={!!errors.companyName && (touchedFields.companyName || showStepErrors[1])} className="w-full" />
+              {errors.companyName && (touchedFields.companyName || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.companyName.message}</p>}
+            </div>
+            <div>
+              <Label className="text-sm">Cédula Jurídica</Label>
+              <Input {...register("legalId")} aria-invalid={!!errors.legalId && (touchedFields.legalId || showStepErrors[1])} className="w-full" />
+              {errors.legalId && (touchedFields.legalId || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.legalId.message}</p>}
+            </div>
           </CardContent>
         </Card>
       )}
@@ -653,12 +767,12 @@ export default function InspectionForm() {
             );
           })}
         </div>
-        {errors.district && <p className="text-sm text-red-600 mt-1">{errors.district.message}</p>}
+  {errors.district && (touchedFields.district || showStepErrors[2]) && <p className="text-sm text-red-600 mt-1">{errors.district.message}</p>}
       </div>
       <div>
         <Label className="mb-2 text-sm">Dirección Exacta</Label>
-        <Textarea rows={textareaRows} placeholder="Ingrese la dirección completa..." {...register("exactAddress")} aria-invalid={!!errors.exactAddress} className="w-full resize-none" />
-        {errors.exactAddress && <p className="text-sm text-red-600 mt-1">{errors.exactAddress.message}</p>}
+  <Textarea rows={textareaRows} placeholder="Ingrese la dirección completa..." {...register("exactAddress")} aria-invalid={!!errors.exactAddress && (touchedFields.exactAddress || showStepErrors[2])} className="w-full resize-none" />
+  {errors.exactAddress && (touchedFields.exactAddress || showStepErrors[2]) && <p className="text-sm text-red-600 mt-1">{errors.exactAddress.message}</p>}
       </div>
     </div>
   );
@@ -692,7 +806,7 @@ export default function InspectionForm() {
             );
           })}
         </div>
-        {errors.dependency && <p className="text-sm text-red-600 mt-1">{errors.dependency.message}</p>}
+  {errors.dependency && (touchedFields.dependency || showStepErrors[3]) && <p className="text-sm text-red-600 mt-1">{errors.dependency.message}</p>}
       </div>
     </div>
   );
@@ -704,17 +818,17 @@ export default function InspectionForm() {
       <CardContent className="space-y-4">
         <div>
           <Label>Tipo de trámite</Label>
-          <Input placeholder="Ej. Permiso especial" {...register("mo_procedureType")} aria-invalid={!!errors.mo_procedureType} />
-          {errors.mo_procedureType && <p className="text-sm text-red-600 mt-1">{errors.mo_procedureType.message}</p>}
+          <Input placeholder="Ej. Permiso especial" {...register("mo_procedureType")} aria-invalid={!!errors.mo_procedureType && (touchedFields.mo_procedureType || showStepErrors[4])} />
+          {errors.mo_procedureType && (touchedFields.mo_procedureType || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.mo_procedureType.message}</p>}
         </div>
         <div>
           <Label>Observaciones</Label>
           <Textarea rows={3} {...register("mo_observations")} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <PhotoField key="mo1" fieldKey="mo1" label="Fotografía N.º 1" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
-          <PhotoField key="mo2" fieldKey="mo2" label="Fotografía N.º 2" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
-          <PhotoField key="mo3" fieldKey="mo3" label="Fotografía N.º 3" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+          <PhotoField key="mo1" fieldKey="mo1" label="Fotografía N.º 1 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+          <PhotoField key="mo2" fieldKey="mo2" label="Fotografía N.º 2 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+          <PhotoField key="mo3" fieldKey="mo3" label="Fotografía N.º 3 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
         </div>
       </CardContent>
     </Card>
@@ -750,14 +864,16 @@ export default function InspectionForm() {
               );
             })}
           </div>
-          {errors.constructionProcedure && <p className="text-sm text-red-600 mt-1">{errors.constructionProcedure.message}</p>}
+          {errors.constructionProcedure && (touchedFields.constructionProcedure || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.constructionProcedure.message}</p>}
         </div>
 
         {constructionProcedure === ConstructionProcedure.UsoSuelo && (
           <Card key="uso-suelo" className="border-slate-200">
             <CardHeader><CardTitle className="text-sm text-blue-700 flex items-center gap-2"><MapPin className="w-4 h-4" /> Uso de Suelo</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>Uso de suelo solicitado</Label><Input {...register("landUseRequested")} aria-invalid={!!errors.landUseRequested} /></div>
+              <div><Label>Uso de suelo solicitado</Label><Input {...register("landUseRequested")} aria-invalid={!!errors.landUseRequested && (touchedFields.landUseRequested || showStepErrors[4])} />
+                {errors.landUseRequested && (touchedFields.landUseRequested || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.landUseRequested.message}</p>}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>¿Concuerda con la ubicación?</Label>
@@ -774,11 +890,12 @@ export default function InspectionForm() {
                     <Label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={watch("landUseMatches") === false}
-                        onCheckedChange={(checked) => setValue("landUseMatches", checked ? false : undefined)}
+                        onCheckedChange={(checked) => setValue("landUseMatches", checked ? false : undefined, { shouldValidate: false, shouldDirty: true })}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                       />
                       No
                     </Label>
+                    {errors.landUseMatches && (touchedFields.landUseMatches || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.landUseMatches.message}</p>}
                   </div>
                 </div>
                 <div>
@@ -796,11 +913,12 @@ export default function InspectionForm() {
                     <Label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={watch("landUseRecommended") === false}
-                        onCheckedChange={(checked) => setValue("landUseRecommended", checked ? false : undefined)}
+                        onCheckedChange={(checked) => setValue("landUseRecommended", checked ? false : undefined, { shouldValidate: false, shouldDirty: true })}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                       />
                       No
                     </Label>
+                    {errors.landUseRecommended && (touchedFields.landUseRecommended || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.landUseRecommended.message}</p>}
                   </div>
                 </div>
               </div>
@@ -817,13 +935,13 @@ export default function InspectionForm() {
             <CardHeader><CardTitle className="text-sm text-blue-700 flex items-center gap-2"><History className="w-4 h-4" /> Antigüedad</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div><Label>N.º de finca</Label><Input {...register("antiguedadNumeroFinca")} aria-invalid={!!errors.antiguedadNumeroFinca} /></div>
-                <div><Label>Antigüedad aproximada</Label><Input {...register("antiguedadAprox")} aria-invalid={!!errors.antiguedadAprox} /></div>
+                <div><Label>N.º de finca</Label><Input {...register("antiguedadNumeroFinca")} aria-invalid={!!errors.antiguedadNumeroFinca && (touchedFields.antiguedadNumeroFinca || showStepErrors[4])} />{errors.antiguedadNumeroFinca && (touchedFields.antiguedadNumeroFinca || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.antiguedadNumeroFinca.message}</p>}</div>
+                <div><Label>Antigüedad aproximada</Label><Input {...register("antiguedadAprox")} aria-invalid={!!errors.antiguedadAprox && (touchedFields.antiguedadAprox || showStepErrors[4])} />{errors.antiguedadAprox && (touchedFields.antiguedadAprox || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.antiguedadAprox.message}</p>}</div>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-                <PhotoField key="antiguedad1" fieldKey="antiguedad1" label="Fotografía N.º 1" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
-                <PhotoField key="antiguedad2" fieldKey="antiguedad2" label="Fotografía N.º 2" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
-                <PhotoField key="antiguedad3" fieldKey="antiguedad3" label="Fotografía N.º 3" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+                <PhotoField key="antiguedad1" fieldKey="antiguedad1" label="Fotografía N.º 1 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+                <PhotoField key="antiguedad2" fieldKey="antiguedad2" label="Fotografía N.º 2 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+                <PhotoField key="antiguedad3" fieldKey="antiguedad3" label="Fotografía N.º 3 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
               </div>
             </CardContent>
           </Card>
@@ -834,8 +952,8 @@ export default function InspectionForm() {
             <CardHeader><CardTitle className="text-sm text-blue-700 flex items-center gap-2"><X className="w-4 h-4" /> Anulación de PC</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><Label>N.º de contrato</Label><Input {...register("pcNumeroContrato")} aria-invalid={!!errors.pcNumeroContrato} /></div>
-                <div><Label>N.º de PC</Label><Input {...register("pcNumero")} aria-invalid={!!errors.pcNumero} /></div>
+                <div><Label>N.º de contrato</Label><Input {...register("pcNumeroContrato")} aria-invalid={!!errors.pcNumeroContrato && (touchedFields.pcNumeroContrato || showStepErrors[4])} />{errors.pcNumeroContrato && (touchedFields.pcNumeroContrato || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.pcNumeroContrato.message}</p>}</div>
+                <div><Label>N.º de PC</Label><Input {...register("pcNumero")} aria-invalid={!!errors.pcNumero && (touchedFields.pcNumero || showStepErrors[4])} />{errors.pcNumero && (touchedFields.pcNumero || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.pcNumero.message}</p>}</div>
                 <div>
                   <Label>¿Construyó?</Label>
                   <div className="flex gap-6 mt-2">
@@ -851,11 +969,12 @@ export default function InspectionForm() {
                     <Label className="flex items-center gap-2 cursor-pointer">
                       <Checkbox
                         checked={watch("pcConstruyo") === false}
-                        onCheckedChange={(checked) => setValue("pcConstruyo", checked ? false : undefined)}
+                        onCheckedChange={(checked) => setValue("pcConstruyo", checked ? false : undefined, { shouldValidate: false, shouldDirty: true })}
                         className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
                       />
                       No
                     </Label>
+                    {errors.pcConstruyo && (touchedFields.pcConstruyo || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.pcConstruyo.message}</p>}
                   </div>
                 </div>
               </div>
@@ -863,7 +982,7 @@ export default function InspectionForm() {
                 <Label>Observaciones</Label>
                 <Textarea rows={3} {...register("pcObservaciones")} />
               </div>
-              <PhotoField fieldKey="pc1" label="Fotografía N.º 1" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+              <PhotoField fieldKey="pc1" label="Fotografía N.º 1 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
             </CardContent>
           </Card>
         )}
@@ -872,9 +991,9 @@ export default function InspectionForm() {
           <Card key="inspeccion-general" className="border-slate-200">
             <CardHeader><CardTitle className="text-sm text-blue-700 flex items-center gap-2"><Search className="w-4 h-4" /> Inspección general</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <div><Label>N.º de finca</Label><Input {...register("igNumeroFinca")} aria-invalid={!!errors.igNumeroFinca} /></div>
+              <div><Label>N.º de finca</Label><Input {...register("igNumeroFinca")} aria-invalid={!!errors.igNumeroFinca && (touchedFields.igNumeroFinca || showStepErrors[4])} />{errors.igNumeroFinca && (touchedFields.igNumeroFinca || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.igNumeroFinca.message}</p>}</div>
               <div><Label>Observaciones</Label><Textarea rows={3} {...register("igObservaciones")} /></div>
-              <PhotoField fieldKey="ig1" label="Fotografía N.º 1" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+              <PhotoField fieldKey="ig1" label="Fotografía N.º 1 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
             </CardContent>
           </Card>
         )}
@@ -884,7 +1003,7 @@ export default function InspectionForm() {
             <CardHeader><CardTitle className="text-sm text-blue-700 flex items-center gap-2"><Check className="w-4 h-4" /> Recibido de obra</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div><Label>Fecha de la visita</Label><Input type="date" {...register("roFechaVisita")} aria-invalid={!!errors.roFechaVisita} /></div>
+                <div><Label>Fecha de la visita</Label><Input type="date" {...register("roFechaVisita")} aria-invalid={!!errors.roFechaVisita && (touchedFields.roFechaVisita || showStepErrors[4])} />{errors.roFechaVisita && (touchedFields.roFechaVisita || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.roFechaVisita.message}</p>}</div>
                 <div className="md:col-span-2">
                   <Label>Estado</Label>
                   <div className="flex flex-wrap gap-4 mt-2">
@@ -905,9 +1024,10 @@ export default function InspectionForm() {
                       </Label>
                     ))}
                   </div>
+                  {errors.roEstado && (touchedFields.roEstado || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.roEstado.message}</p>}
                 </div>
               </div>
-              <PhotoField fieldKey="ro1" label="Fotografía N.º 1" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
+              <PhotoField fieldKey="ro1" label="Fotografía N.º 1 (requerida)" photos={photos} setPhotos={setPhotos} photoErrors={photoErrors} setPhotoErrors={setPhotoErrors} />
             </CardContent>
           </Card>
         )}
@@ -933,10 +1053,10 @@ export default function InspectionForm() {
               <Input
                 placeholder='Ej. "EXP-1313-2004"'
                 {...register("zc_fileNumber")}
-                aria-invalid={!!errors.zc_fileNumber}
+                aria-invalid={!!errors.zc_fileNumber && (touchedFields.zc_fileNumber || showStepErrors[4])}
                 className="mt-1"
               />
-              {errors.zc_fileNumber && <p className="text-sm text-red-600 mt-1">{errors.zc_fileNumber.message}</p>}
+              {errors.zc_fileNumber && (touchedFields.zc_fileNumber || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.zc_fileNumber.message}</p>}
             </div>
 
             <div>
@@ -951,7 +1071,7 @@ export default function InspectionForm() {
                 <option value="Renovación">Renovación</option>
                 <option value="Modificación">Modificación</option>
               </select>
-              {errors.zc_concessionType && <p className="text-sm text-red-600 mt-1">{errors.zc_concessionType.message}</p>}
+              {errors.zc_concessionType && (touchedFields.zc_concessionType || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.zc_concessionType.message}</p>}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -960,10 +1080,10 @@ export default function InspectionForm() {
                 <Input
                   type="date"
                   {...register("zc_grantedAt")}
-                  aria-invalid={!!errors.zc_grantedAt}
+                  aria-invalid={!!errors.zc_grantedAt && (touchedFields.zc_grantedAt || showStepErrors[4])}
                   className="mt-1"
                 />
-                {errors.zc_grantedAt && <p className="text-sm text-red-600 mt-1">{errors.zc_grantedAt.message}</p>}
+                {errors.zc_grantedAt && (touchedFields.zc_grantedAt || showStepErrors[4]) && <p className="text-sm text-red-600 mt-1">{errors.zc_grantedAt.message}</p>}
               </div>
               <div>
                 <Label className="text-sm font-medium">Fecha de vencimiento (opcional)</Label>
@@ -1313,7 +1433,7 @@ export default function InspectionForm() {
             <PhotoField
               key="zmt1"
               fieldKey="zmt1"
-              label="Fotografía N.º 1"
+              label="Fotografía N.º 1 (requerida)"
               photos={photos}
               setPhotos={setPhotos}
               photoErrors={photoErrors}
@@ -1322,7 +1442,7 @@ export default function InspectionForm() {
             <PhotoField
               key="zmt2"
               fieldKey="zmt2"
-              label="Fotografía N.º 2"
+              label="Fotografía N.º 2 (requerida)"
               photos={photos}
               setPhotos={setPhotos}
               photoErrors={photoErrors}
@@ -1331,7 +1451,7 @@ export default function InspectionForm() {
             <PhotoField
               key="zmt3"
               fieldKey="zmt3"
-              label="Fotografía N.º 3"
+              label="Fotografía N.º 3 (requerida)"
               photos={photos}
               setPhotos={setPhotos}
               photoErrors={photoErrors}
@@ -1362,46 +1482,9 @@ export default function InspectionForm() {
   const onFinalSubmit = handleSubmit(async (values) => {
     setSubmitting(true);
     try {
-      // Reglas de fotos mínimas por trámite
-      const need = (keys) => keys.every((k) => photos[k]);
-      if (values.dependency === Dependency.Constructions) {
-        if (values.constructionProcedure === ConstructionProcedure.Antiguedad && !need(["antiguedad1", "antiguedad2", "antiguedad3"]))
-          return await Swal.fire({
-            title: 'Faltan fotografías',
-            text: 'Sube las 3 fotografías de Antigüedad.',
-            icon: 'warning',
-            timer: 4000,
-            showConfirmButton: false,
-            timerProgressBar: true,
-          });
-        if (values.constructionProcedure === ConstructionProcedure.AnulacionPC && !need(["pc1"]))
-          return await Swal.fire({
-            title: 'Falta fotografía',
-            text: 'Sube la fotografía N.º 1 para Anulación de PC.',
-            icon: 'warning',
-            timer: 4000,
-            showConfirmButton: false,
-            timerProgressBar: true,
-          });
-        if (values.constructionProcedure === ConstructionProcedure.InspeccionGeneral && !need(["ig1"]))
-          return await Swal.fire({
-            title: 'Falta fotografía',
-            text: 'Sube la fotografía N.º 1 para Inspección general.',
-            icon: 'warning',
-            timer: 4000,
-            showConfirmButton: false,
-            timerProgressBar: true,
-          });
-        if (values.constructionProcedure === ConstructionProcedure.RecibidoObra && !need(["ro1"]))
-          return await Swal.fire({
-            title: 'Falta fotografía',
-            text: 'Sube la fotografía N.º 1 para Recibido de obra.',
-            icon: 'warning',
-            timer: 4000,
-            showConfirmButton: false,
-            timerProgressBar: true,
-          });
-      }
+      // Validación unificada de fotos requeridas (inline + scroll)
+      const photosOkBeforeSubmit = validateRequiredPhotos(values);
+      if (!photosOkBeforeSubmit) return; // solo inline errors
 
       // Armar payload
       const applicant =
@@ -1553,6 +1636,7 @@ export default function InspectionForm() {
         showConfirmButton: false,
         timerProgressBar: true,
       });
+      setShowStepErrors({ 1: false, 2: false, 3: false, 4: false });
     } catch (err) {
       console.error(err);
       // Mostrar SweetAlert de error con mensaje específico del backend
@@ -1587,24 +1671,16 @@ export default function InspectionForm() {
 
           <CardContent className="p-4 sm:p-6 lg:p-8 w-full">
             <form onSubmit={onFinalSubmit} onKeyDown={(e) => {
-              // Verificaciones de seguridad exhaustivas
+              // Reducir interferencia con escritura y composición
               if (!e || !e.key || !e.target) return;
-              
-              // Prevenir Enter en inputs y selects para evitar envío accidental del formulario
-              if (e.key === "Enter" && e.target.tagName !== "TEXTAREA") {
-                
-                // Verificar que el método closest existe antes de usarlo
-                if (typeof e.target.closest === 'function') {
-                  // Solo permitir Enter en inputs de parcelas
-                  if (e.target.closest('[data-parcel-input]')) {
-                    return; // Permitir Enter en inputs de parcelas
-                  }
-                }
-                
-                // Prevenir en inputs y selects
-                if (['INPUT', 'SELECT'].includes(e.target.tagName)) {
-                  e.preventDefault();
-                }
+              const tag = e.target.tagName;
+              const isTextInput = tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA';
+              // Evitar bloquear IME (teclados en otros idiomas)
+              if (e.isComposing) return;
+              // Solo prevenir Enter para submit accidental en inputs generales (no textareas ni campos de parcela)
+              if (e.key === 'Enter' && tag !== 'TEXTAREA') {
+                if (typeof e.target.closest === 'function' && e.target.closest('[data-parcel-input]')) return;
+                if (isTextInput) e.preventDefault();
               }
             }} className="w-full">
               {currentStep === 1 && <Step1 />}

@@ -16,6 +16,8 @@ import { useUsers } from "../hooks/useUsers"
 import { useAuth } from "../hooks/useAuth"
 import UserForm from "../components/users/UserForm"
 import EditUserForm from "../components/users/EditUserForm" // <--- tu nuevo componente
+// Paginación compartida
+const Pagination = React.lazy(() => import("@/components/ui/pagination"))
 
 // ——— UI Primitives ———
 const Container = ({ children }) => (
@@ -200,6 +202,8 @@ export default function UsersPage() {
   const [roleFilter, setRoleFilter] = useState("Todos")
   const [showForm, setShowForm] = useState(false)
   const [editing, setEditing] = useState(null)
+  const ITEMS_PER_PAGE = 12
+  const [page, setPage] = useState(1)
 
   // Title-case roles
   const enriched = users
@@ -222,6 +226,17 @@ export default function UsersPage() {
       }),
     [enriched, search, roleFilter]
   )
+
+  // resetear a la página 1 cuando cambien filtros/búsqueda
+  React.useEffect(() => {
+    setPage(1)
+  }, [search, roleFilter])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE))
+  const paged = React.useMemo(() => {
+    const start = (page - 1) * ITEMS_PER_PAGE
+    return filtered.slice(start, start + ITEMS_PER_PAGE)
+  }, [filtered, page])
 
   const stats = [
     { label: "Total Usuarios", value: enriched.length, icon: UsersIcon, color: "text-gray-400" },
@@ -275,7 +290,7 @@ export default function UsersPage() {
 
       <ListHeader count={filtered.length} />
       <div className="space-y-2 mt-2">
-        {filtered.map(u => (
+        {paged.map(u => (
           <UserItem
             key={u.id}
             u={u}
@@ -289,6 +304,18 @@ export default function UsersPage() {
           <p className="text-center text-gray-500 py-8">No se encontraron usuarios.</p>
         )}
       </div>
+
+      {/* Paginación */}
+      {totalPages > 1 && (
+        <React.Suspense fallback={<div className="flex justify-center text-sm text-gray-500">Cargando paginación…</div>}>
+          <Pagination
+            page={page}
+            total={filtered.length}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={setPage}
+          />
+        </React.Suspense>
+      )}
 
       {/* Modal Crear / Editar */}
       {showForm && (

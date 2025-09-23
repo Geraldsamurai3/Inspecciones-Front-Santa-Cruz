@@ -1,5 +1,6 @@
-import React from "react"
+import React, { Suspense } from "react"
 import { Search } from "lucide-react"
+const Pagination = React.lazy(() => import("@/components/ui/pagination"))
 
 export default function UserList({
   users,
@@ -90,33 +91,13 @@ export default function UserList({
 
       {/* paginación */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center space-x-2">
-          <button
-            disabled={currentPage === 1}
-            onClick={() => onPageChange(currentPage - 1)}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Anterior
-          </button>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i+1}
-              onClick={() => onPageChange(i+1)}
-              className={`px-3 py-1 rounded ${
-                currentPage === i+1 ? "bg-blue-600 text-white" : "bg-gray-200"
-              }`}
-            >
-              {i+1}
-            </button>
-          ))}
-          <button
-            disabled={currentPage === totalPages}
-            onClick={() => onPageChange(currentPage + 1)}
-            className="px-3 py-1 border rounded disabled:opacity-50"
-          >
-            Siguiente
-          </button>
-        </div>
+        <Suspense fallback={<div className="flex justify-center text-sm text-gray-500">Cargando paginación…</div>}>
+          <Pagination
+            page={currentPage}
+            pageCount={totalPages}
+            onPageChange={onPageChange}
+          />
+        </Suspense>
       )}
     </div>
 )

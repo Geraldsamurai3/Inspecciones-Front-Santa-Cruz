@@ -20,20 +20,27 @@ export default function Sidebar() {
   const [open, setOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const role = (user?.role || user?.rol || '').toString().trim().toLowerCase()
 
   const handleLogout = () => {
     logout()
     navigate('/admin/login', { replace: true })
   }
 
-  const menuItems = [
-    { to: '/admin/dashboard',   label: 'Dashboard',    icon: <Home size={20}/> },
-    { to: '/admin/inspections', label: 'Inspecciones', icon: <ClipboardList size={20}/> },
-    { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <FileText size={20}/> },
-    { to: '/admin/users',        label: 'Usuarios',     icon: <Users size={20}/> },
-    { to: '/admin/settings',     label: 'Ajustes',      icon: <Settings size={20}/> },
-    { to: '/admin/inspectionsform', label: 'Formulario Inspecciones', icon: <ClipboardList size={20}/> },
+  const allItems = [
+    { to: '/admin/dashboard',   label: 'Dashboard',    icon: <Home size={20}/>, roles: ['admin','inspector'] },
+    { to: '/admin/inspectionsform', label: 'Formulario Inspecciones', icon: <ClipboardList size={20}/>, roles: ['admin','inspector'] },
+    { to: '/admin/inspections', label: 'Inspecciones', icon: <ClipboardList size={20}/>, roles: ['admin'] },
+    { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <FileText size={20}/>, roles: ['admin'] },
+    { to: '/admin/users',        label: 'Usuarios',     icon: <Users size={20}/>, roles: ['admin'] },
+    { to: '/admin/settings',     label: 'Ajustes',      icon: <Settings size={20}/>, roles: ['admin'] },
   ]
+  const menuItems = allItems.filter(item => {
+    if (role === 'admin') return true
+    if (role === 'inspector') return item.roles?.includes('inspector')
+    // por defecto, mostrar solo lo mínimo
+    return item.roles?.includes('inspector')
+  })
 
   return (
     <>

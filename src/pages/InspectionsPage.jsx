@@ -70,7 +70,7 @@ export default function InspectionsPage() {
   const [search, setSearch]     = useState("")
   const [filterStatus, setFilterStatus] = useState("Todos")
   const [page, setPage]         = useState(1)
-  const ITEMS_PER_PAGE = 4
+  const ITEMS_PER_PAGE = 12
 
   const statuses = ["Todos", "Pendiente", "En curso", "Revisada"]
 
@@ -84,6 +84,9 @@ export default function InspectionsPage() {
 
   const totalPages = Math.ceil(filtered.length / ITEMS_PER_PAGE)
   const slice = filtered.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE)
+
+  // Reusable Pagination component
+  const Pagination = React.lazy(() => import("@/components/ui/pagination"))
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen space-y-6">
@@ -130,25 +133,10 @@ export default function InspectionsPage() {
               </button>
               {/* Dropdown logic omitted for demo */}
             </div>
-            <div className="mt-4 flex space-x-2">
+            <div className="mt-4 flex">
               <Button variant="outline" size="sm">
-                <Eye className="h-4 w-4 mr-1" /> Ver
+                <Eye className="h-4 w-4 mr-1" /> Ver más
               </Button>
-              {item.status === "Pendiente" && (
-                <Button variant="solid" size="sm">
-                  <Play className="h-4 w-4 mr-1" /> Iniciar
-                </Button>
-              )}
-              {item.status === "En curso" && (
-                <Button variant="solid" size="sm">
-                  <CheckCircle className="h-4 w-4 mr-1" /> Completar
-                </Button>
-              )}
-              {item.status === "Revisada" && (
-                <Button variant="outline" size="sm">
-                  <Archive className="h-4 w-4 mr-1" /> Archivar
-                </Button>
-              )}
             </div>
           </Card>
         ))}
@@ -156,33 +144,14 @@ export default function InspectionsPage() {
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex justify-center items-center space-x-2">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.max(p - 1, 1))}
-            disabled={page === 1}
-          >
-            Anterior
-          </Button>
-          {Array.from({ length: totalPages }, (_, i) => (
-            <button
-              key={i}
-              onClick={() => setPage(i + 1)}
-              className={`px-3 py-1 rounded ${page === i + 1 ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"}`}
-            >
-              {i + 1}
-            </button>
-          ))}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setPage(p => Math.min(p + 1, totalPages))}
-            disabled={page === totalPages}
-          >
-            Siguiente
-          </Button>
-        </div>
+        <React.Suspense fallback={<div className="flex justify-center text-sm text-gray-500">Cargando paginación…</div>}>
+          <Pagination
+            page={page}
+            total={filtered.length}
+            pageSize={ITEMS_PER_PAGE}
+            onPageChange={setPage}
+          />
+        </React.Suspense>
       )}
     </div>
   )

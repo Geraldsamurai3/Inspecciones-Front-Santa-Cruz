@@ -2,6 +2,7 @@
 import React from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import RequireAuth from './components/RequireAuth'
+import RequireRole from './components/RequireRole'
 import AdminLayout from './components/admin/AdminLayout'
 import UsersPage from './pages/UsersPage.jsx'
 import LoginPage from './components/auth/LoginPage.jsx'
@@ -30,14 +31,19 @@ export default function App() {
           {/* /admin → /admin/dashboard */}
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
 
-          {/* Aquí añades tus rutas hijas protegidas */}
-          
-          <Route path="/admin/profile" element={<ProfilePage />} />
-          <Route path="/admin/users"       element={<UsersPage />}      />
-          <Route path="/admin/dashboard"       element={<DashboardPage />}      />
-          <Route path="/admin/inspections"       element={<InspectionsPage />}      />
-          <Route path="/admin/inspections-management" element={<InspectionManagementPage />} />
-          <Route path="/admin/inspectionsform"       element={<InspectionForm />}      />
+          {/* Rutas accesibles para Inspectores (y Admin por herencia) */}
+          <Route element={<RequireRole roles={["inspector"]} />}>
+            <Route path="/admin/dashboard" element={<DashboardPage />} />
+            <Route path="/admin/inspectionsform" element={<InspectionForm />} />
+            <Route path="/admin/profile" element={<ProfilePage />} />
+          </Route>
+
+          {/* Rutas exclusivas de Admin (Admin ya pasa en RequireRole, pero hacemos explícito) */}
+          <Route element={<RequireRole roles={["admin"]} />}>
+            <Route path="/admin/users" element={<UsersPage />} />
+            <Route path="/admin/inspections" element={<InspectionsPage />} />
+            <Route path="/admin/inspections-management" element={<InspectionManagementPage />} />
+          </Route>
 
 
           {/* … más rutas protegidas /admin/tuRuta */}

@@ -4,6 +4,13 @@ export const ApplicantType = Object.freeze({
   JURIDICA: "JURIDICA",
 });
 
+export const InspectionStatus = Object.freeze({
+  NUEVO: "Nuevo",
+  EN_PROCESO: "En proceso",
+  REVISADO: "Revisado",
+  ARCHIVADO: "Archivado",
+});
+
 export const District = Object.freeze({
   SantaCruz: "SantaCruz",
   Bolson: "Bolson",

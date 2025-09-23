@@ -17,10 +17,12 @@ import {
   Phone,
   Mail,
   Hash,
-  History,
-  XCircle,
-  ClipboardCheck,
-  Hammer
+  Image,
+  ZoomIn,
+  TrendingUp,
+  AlertTriangle,
+  Users,
+  BarChart3
 } from 'lucide-react';
 
 // shadcn/ui components
@@ -32,52 +34,109 @@ import { Badge } from '@/components/ui/badge';
 // Hooks
 import { useInspections } from '@/hooks/useInspections';
 import { formatRelativeTime } from '@/utils/date-helpers';
-import { Dependency } from '@/domain/enums';
+import { Dependency, InspectionStatus } from '@/domain/enums';
+
+// Debug: Verificar valores del enum
+console.log('InspectionStatus enum values:', InspectionStatus);
+
+// Función para normalizar el estado desde el backend
+const normalizeStatus = (status) => {
+  if (!status) return InspectionStatus.NUEVO;
+  
+  // Mapeo de posibles valores del backend a nuestro enum
+  const statusMap = {
+    'Nuevo': InspectionStatus.NUEVO,
+    'nuevo': InspectionStatus.NUEVO,
+    'NUEVO': InspectionStatus.NUEVO,
+    
+    'En Proceso': InspectionStatus.EN_PROCESO,
+    'En proceso': InspectionStatus.EN_PROCESO,
+    'en proceso': InspectionStatus.EN_PROCESO,
+    'EN_PROCESO': InspectionStatus.EN_PROCESO,
+    'EnProceso': InspectionStatus.EN_PROCESO,
+    
+    'Revisado': InspectionStatus.REVISADO,
+    'revisado': InspectionStatus.REVISADO,
+    'REVISADO': InspectionStatus.REVISADO,
+    'Respondido': InspectionStatus.REVISADO,
+    'respondido': InspectionStatus.REVISADO,
+    'RESPONDIDO': InspectionStatus.REVISADO,
+    'Completado': InspectionStatus.REVISADO,
+    'completado': InspectionStatus.REVISADO,
+    
+    'Archivado': InspectionStatus.ARCHIVADO,
+    'archivado': InspectionStatus.ARCHIVADO,
+    'ARCHIVADO': InspectionStatus.ARCHIVADO,
+  };
+  
+  return statusMap[status] || status; // Si no encuentra mapeo, devuelve el original
+};
+
+// Deducir dependencia efectiva (coincidir con la usada para renderizar la tarjeta)
+const getEffectiveDependencyKey = (inspection) => {
+  let key = inspection?.dependency;
+  if (!key || key.trim() === '') {
+    if (inspection?.mayorOffice) return 'MayorOffice';
+    if (inspection?.landUse || inspection?.antiquity || inspection?.pcCancellation || inspection?.generalInspection || inspection?.workReceipt) return 'Constructions';
+    if (inspection?.concession) return 'MaritimeZone';
+    if (inspection?.realEstate) return 'RealEstate';
+    if (inspection?.collections) return 'Collections';
+    if (inspection?.taxesAndLicenses) return 'TaxesAndLicenses';
+    if (inspection?.servicePlatform) return 'ServicePlatform';
+  }
+  return key;
+};
 
 // Mapeo de estados
 const statusConfig = {
-  'Nuevo': { 
+  [InspectionStatus.NUEVO]: { 
     color: 'bg-blue-100 text-blue-800 border-blue-200', 
     label: 'Nuevo',
     actions: ['view', 'start']
   },
-  'En Proceso': { 
+  [InspectionStatus.EN_PROCESO]: { 
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
     label: 'En Proceso',
     actions: ['view', 'complete']
   },
-  'Respondido': { 
+  [InspectionStatus.REVISADO]: { 
     color: 'bg-green-100 text-green-800 border-green-200', 
-    label: 'Completado',
+    label: 'Revisado',
     actions: ['view', 'archive']
   },
-  'Archivado': { 
+  [InspectionStatus.ARCHIVADO]: { 
     color: 'bg-gray-100 text-gray-800 border-gray-200', 
     label: 'Archivado',
     actions: ['view']
   }
 };
 
+// Función helper para obtener configuración de estado con fallback
+const getStatusConfig = (status) => {
+  const normalizedStatus = normalizeStatus(status);
+  return statusConfig[normalizedStatus] || statusConfig[InspectionStatus.NUEVO];
+};
+
 // Mapeo de colores por dependencia
 const dependencyConfig = {
   'MayorOffice': {
-    borderColor: '#8b5cf6', // purple-500
-    bgColor: '#faf5ff', // purple-50
-    badgeStyle: { backgroundColor: '#e9d5ff', color: '#6b21a8', border: '1px solid #d8b4fe' },
+    borderColor: '#10b981', // emerald-500
+    bgColor: '#ecfdf5', // emerald-50
+    badgeStyle: { backgroundColor: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' },
     label: 'Alcaldía',
     icon: Building
   },
   'RealEstate': {
-    borderColor: '#10b981', // emerald-500
-    bgColor: '#ecfdf5', // emerald-50
-    badgeStyle: { backgroundColor: '#d1fae5', color: '#065f46', border: '1px solid #a7f3d0' },
+    borderColor: '#84cc16', // lime-500
+    bgColor: '#f7fee7', // lime-50
+    badgeStyle: { backgroundColor: '#ecfccb', color: '#365314', border: '1px solid #d9f99d' },
     label: 'Bienes Inmuebles',
     icon: Building
   },
   'Collections': {
-    borderColor: '#f97316', // orange-500
-    bgColor: '#fff7ed', // orange-50
-    badgeStyle: { backgroundColor: '#fed7aa', color: '#9a3412', border: '1px solid #fdba74' },
+    borderColor: '#f59e0b', // amber-500
+    bgColor: '#fffbeb', // amber-50
+    badgeStyle: { backgroundColor: '#fde68a', color: '#92400e', border: '1px solid #fcd34d' },
     label: 'Cobros',
     icon: FileText
   },
@@ -96,9 +155,9 @@ const dependencyConfig = {
     icon: FileText
   },
   'ServicePlatform': {
-    borderColor: '#6366f1', // indigo-500
-    bgColor: '#eef2ff', // indigo-50
-    badgeStyle: { backgroundColor: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' },
+    borderColor: '#d946ef', // fuchsia-500
+    bgColor: '#fdf4ff', // fuchsia-50
+    badgeStyle: { backgroundColor: '#fae8ff', color: '#86198f', border: '1px solid #f5d0fe' },
     label: 'Plataforma de Servicios',
     icon: Building
   },
@@ -111,19 +170,91 @@ const dependencyConfig = {
   }
 };
 
-// Función helper para determinar la dependencia de una inspección
-const getDependencyKey = (inspection) => {
-  if (inspection.dependency) return inspection.dependency;
-  
-  if (inspection.mayorOffice) return 'MayorOffice';
-  if (inspection.landUse || inspection.antiquity || inspection.pcCancellation || inspection.generalInspection || inspection.workReceipt) return 'Constructions';
-  if (inspection.concession) return 'MaritimeZone';
-  if (inspection.realEstate) return 'RealEstate';
-  if (inspection.collections) return 'Collections';
-  if (inspection.taxesAndLicenses) return 'TaxesAndLicenses';
-  if (inspection.servicePlatform) return 'ServicePlatform';
-  
-  return null;
+// Componente para mostrar galería de fotos
+const PhotoGallery = ({ photos, title }) => {
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [showImageModal, setShowImageModal] = useState(false);
+
+  if (!photos || photos.length === 0) return null;
+
+  const openImage = (photo) => {
+    setSelectedImage(photo);
+    setShowImageModal(true);
+  };
+
+  const closeImageModal = () => {
+    setShowImageModal(false);
+    setSelectedImage(null);
+  };
+
+  return (
+    <>
+      <div>
+        <div className="flex items-center gap-2 mb-3">
+          <Image className="w-4 h-4" />
+          <span className="font-medium">{title} ({photos.length})</span>
+        </div>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+          {photos.map((photo, index) => (
+            <div 
+              key={index} 
+              className="relative group cursor-pointer rounded-lg overflow-hidden border-2 border-gray-200 hover:border-blue-400 transition-all duration-200"
+              onClick={() => openImage(photo)}
+            >
+              <img
+                src={photo}
+                alt={`Foto ${index + 1}`}
+                className="w-full h-24 object-cover group-hover:scale-105 transition-transform duration-200"
+                onError={(e) => {
+                  e.target.style.display = 'none';
+                  e.target.nextSibling.style.display = 'flex';
+                }}
+              />
+              <div className="hidden absolute inset-0 bg-gray-200 items-center justify-center">
+                <Image className="w-6 h-6 text-gray-400" />
+                <span className="text-xs text-gray-500 ml-1">Error al cargar</span>
+              </div>
+              <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all duration-200 flex items-center justify-center opacity-0 group-hover:opacity-100">
+                <ZoomIn className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute bottom-1 left-1 bg-black bg-opacity-60 text-white text-xs px-2 py-1 rounded">
+                {index + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Modal para imagen ampliada */}
+      {showImageModal && selectedImage && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 z-50 flex items-center justify-center p-4">
+          <div className="relative max-w-4xl max-h-full">
+            <button
+              onClick={closeImageModal}
+              className="absolute top-4 right-4 bg-black bg-opacity-50 text-white rounded-full p-2 hover:bg-opacity-75 transition-all duration-200 z-10"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <img
+              src={selectedImage}
+              alt="Imagen de la inspección"
+              className="max-w-full max-h-full object-contain rounded-lg"
+              onError={(e) => {
+                e.target.style.display = 'none';
+                e.target.nextSibling.style.display = 'flex';
+              }}
+            />
+            <div className="hidden absolute inset-0 bg-gray-800 rounded-lg items-center justify-center">
+              <div className="text-center text-white">
+                <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>Error al cargar la imagen</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
 };
 
 // Componente del modal de detalles
@@ -131,15 +262,42 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
   if (!isOpen || !inspection) return null;
 
   const formatDate = (dateStr) => {
+    if (!dateStr) return 'No especificada';
+    
     try {
-      return new Date(dateStr).toLocaleDateString('es-ES', {
-        year: 'numeric',
-        month: 'long', 
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
-      });
-    } catch {
+      let date;
+      
+      // Si es solo una fecha (YYYY-MM-DD), agregar la zona horaria para evitar problemas
+      if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+        date = new Date(dateStr + 'T00:00:00');
+      } else {
+        date = new Date(dateStr);
+      }
+      
+      // Verificar si la fecha es válida
+      if (isNaN(date.getTime())) {
+        return dateStr;
+      }
+      
+      // Si el string original incluye hora (T o :), mostrar fecha y hora
+      if (dateStr.includes('T') || dateStr.includes(':')) {
+        return date.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long', 
+          day: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } else {
+        // Solo fecha
+        return date.toLocaleDateString('es-ES', {
+          year: 'numeric',
+          month: 'long', 
+          day: 'numeric'
+        });
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error, 'dateStr:', dateStr);
       return dateStr;
     }
   };
@@ -175,8 +333,8 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
             <div>
               <label className="text-sm font-medium text-gray-500">Estado</label>
               <div className="mt-1">
-                <Badge className={statusConfig[inspection.status]?.color}>
-                  {statusConfig[inspection.status]?.label || inspection.status}
+                <Badge className={getStatusConfig(inspection.status).color}>
+                  {getStatusConfig(inspection.status).label}
                 </Badge>
               </div>
             </div>
@@ -285,10 +443,15 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
           {inspection.mayorOffice && (
             <div>
               <label className="text-sm font-medium text-gray-500">Detalles - Alcaldía</label>
-              <div className="bg-purple-50 p-4 rounded-lg space-y-2">
+              <div className="bg-emerald-50 p-4 rounded-lg space-y-2">
                 <p><span className="font-medium">Tipo de trámite:</span> {inspection.mayorOffice.procedureType}</p>
                 {inspection.mayorOffice.observations && (
                   <p><span className="font-medium">Observaciones:</span> {inspection.mayorOffice.observations}</p>
+                )}
+                
+                {/* Fotos de alcaldía */}
+                {inspection.mayorOffice.photos && inspection.mayorOffice.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.mayorOffice.photos} title="Fotos del trámite" />
                 )}
               </div>
             </div>
@@ -310,6 +473,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                     </pre>
                   </div>
                 )}
+                
+                {/* Fotos de construcción */}
+                {inspection.construction.photos && inspection.construction.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.construction.photos} title="Fotos de la construcción" />
+                )}
               </div>
             </div>
           )}
@@ -325,6 +493,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                 {inspection.landUse.observations && (
                   <p><span className="font-medium">Observaciones:</span> {inspection.landUse.observations}</p>
                 )}
+                
+                {/* Fotos de uso de suelo */}
+                {inspection.landUse.photos && inspection.landUse.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.landUse.photos} title="Fotos del uso de suelo" />
+                )}
               </div>
             </div>
           )}
@@ -336,6 +509,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
               <div className="bg-yellow-50 p-4 rounded-lg space-y-2">
                 <p><span className="font-medium">Número de Finca:</span> {inspection.antiquity.propertyNumber}</p>
                 <p><span className="font-medium">Antigüedad Estimada:</span> {inspection.antiquity.estimatedAntiquity}</p>
+                
+                {/* Fotos de antigüedad */}
+                {inspection.antiquity.photos && inspection.antiquity.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.antiquity.photos} title="Fotos de la propiedad" />
+                )}
               </div>
             </div>
           )}
@@ -351,6 +529,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                 {inspection.pcCancellation.observations && (
                   <p><span className="font-medium">Observaciones:</span> {inspection.pcCancellation.observations}</p>
                 )}
+                
+                {/* Fotos de anulación PC */}
+                {inspection.pcCancellation.photos && inspection.pcCancellation.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.pcCancellation.photos} title="Fotos de la anulación PC" />
+                )}
               </div>
             </div>
           )}
@@ -364,6 +547,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                 {inspection.generalInspection.observations && (
                   <p><span className="font-medium">Observaciones:</span> {inspection.generalInspection.observations}</p>
                 )}
+                
+                {/* Fotos de inspección general */}
+                {inspection.generalInspection.photos && inspection.generalInspection.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.generalInspection.photos} title="Fotos de la inspección" />
+                )}
               </div>
             </div>
           )}
@@ -375,6 +563,11 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
               <div className="bg-emerald-50 p-4 rounded-lg space-y-2">
                 <p><span className="font-medium">Fecha de Visita:</span> {formatDate(inspection.workReceipt.visitDate)}</p>
                 <p><span className="font-medium">Estado:</span> {inspection.workReceipt.state}</p>
+                
+                {/* Fotos del recibido de obra */}
+                {inspection.workReceipt.photos && inspection.workReceipt.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.workReceipt.photos} title="Fotos del recibido de obra" />
+                )}
               </div>
             </div>
           )}
@@ -395,6 +588,12 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                 {inspection.concession.observations && (
                   <p><span className="font-medium">Observaciones:</span> {inspection.concession.observations}</p>
                 )}
+                
+                {/* Fotos de la concesión */}
+                {inspection.concession.photos && inspection.concession.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.concession.photos} title="Fotos de la concesión" />
+                )}
+                
                 {inspection.concession.parcels && inspection.concession.parcels.length > 0 && (
                   <div>
                     <span className="font-medium">Parcelas ({inspection.concession.parcels.length}):</span>
@@ -427,6 +626,14 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
             </div>
           )}
 
+          {/* Fotos generales de la inspección */}
+          {inspection.photos && inspection.photos.length > 0 && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Fotos de la Inspección</label>
+              <PhotoGallery photos={inspection.photos} title="Fotos generales" />
+            </div>
+          )}
+
           {/* Fechas de auditoría */}
           <div className="border-t pt-4">
             <label className="text-sm font-medium text-gray-500 block mb-2">Información del Sistema</label>
@@ -449,20 +656,20 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
 
         {/* Acciones */}
         <div className="sticky bottom-0 bg-gray-50 px-6 py-4 flex gap-2">
-          {statusConfig[inspection.status]?.actions?.includes('start') && (
-            <Button onClick={() => onStatusChange(inspection.id, 'En Proceso')}>
+          {getStatusConfig(inspection.status).actions?.includes('start') && (
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onStatusChange(inspection.id, InspectionStatus.EN_PROCESO)}>
               <Play className="w-4 h-4 mr-2" />
               Iniciar
             </Button>
           )}
-          {statusConfig[inspection.status]?.actions?.includes('complete') && (
-            <Button onClick={() => onStatusChange(inspection.id, 'Respondido')}>
+          {getStatusConfig(inspection.status).actions?.includes('complete') && (
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => onStatusChange(inspection.id, InspectionStatus.REVISADO)}>
               <CheckCircle className="w-4 h-4 mr-2" />
               Completar
             </Button>
           )}
-          {statusConfig[inspection.status]?.actions?.includes('archive') && (
-            <Button variant="outline" onClick={() => onStatusChange(inspection.id, 'Archivado')}>
+          {getStatusConfig(inspection.status).actions?.includes('archive') && (
+            <Button variant="outline" onClick={() => onStatusChange(inspection.id, InspectionStatus.ARCHIVADO)}>
               <Archive className="w-4 h-4 mr-2" />
               Archivar
             </Button>
@@ -475,7 +682,7 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
 
 // Componente principal
 export default function InspectionManagementPage() {
-  const { inspections, loading, error, fetchInspections, updateInspection } = useInspections({ 
+  const { inspections, loading, error, fetchInspections, updateInspectionStatus } = useInspections({ 
     autoFetch: true,
     initialParams: {}
   });
@@ -484,17 +691,47 @@ export default function InspectionManagementPage() {
   const [dependencyFilter, setDependencyFilter] = useState('Todos');
   const [selectedInspection, setSelectedInspection] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [loadingStates, setLoadingStates] = useState({}); // Para manejar el loading de botones individuales
+  const [page, setPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
+  const Pagination = React.lazy(() => import("@/components/ui/pagination"));
 
   // Filtros disponibles
-  const statuses = ['Todos', ...Object.keys(statusConfig)];
-  const dependencies = ['Todos', ...Object.keys(dependencyConfig)];
-
-  // Filtrado de inspecciones
-  const filteredInspections = useMemo(() => {
-    console.log('Filtros aplicados:', { search, statusFilter, dependencyFilter });
-    console.log('Total inspecciones:', inspections.length);
+  const statuses = ['Todos', ...Object.values(InspectionStatus)];
+  
+  // Dependencias disponibles (siempre mostrar las del config + cualquier adicional de los datos)
+  const availableDependencies = useMemo(() => {
+    // Empezar con las dependencias del config
+    const configLabels = Object.values(dependencyConfig).map(config => config.label);
     
-    const filtered = inspections.filter(inspection => {
+    // Agregar dependencias adicionales de los datos reales que no estén en el config
+    const additionalDeps = new Set();
+    inspections.forEach(inspection => {
+      if (inspection.dependency && 
+          inspection.dependency.trim() !== '' && 
+          !configLabels.includes(inspection.dependency) &&
+          !Object.keys(dependencyConfig).includes(inspection.dependency)) {
+        additionalDeps.add(inspection.dependency);
+      }
+    });
+    
+    return ['Todos', ...configLabels.sort(), ...Array.from(additionalDeps).sort()];
+  }, [inspections]);
+
+  // Filtrado de inspecciones y cálculo de métricas
+  const filteredInspections = useMemo(() => {
+    console.log('=== DEPENDENCY FILTER DEBUG ===');
+    console.log('dependencyFilter selected:', dependencyFilter);
+    console.log('Total inspections:', inspections.length);
+    
+    if (inspections.length > 0) {
+      console.log('Sample inspection dependencies:');
+      inspections.slice(0, 3).forEach((insp, i) => {
+        console.log(`  ${i+1}. dependency: "${insp.dependency}"`);
+      });
+    }
+    
+    return inspections.filter(inspection => {
       const matchesSearch = search === '' || 
         inspection.procedureNumber?.toLowerCase().includes(search.toLowerCase()) ||
         inspection.location?.exactAddress?.toLowerCase().includes(search.toLowerCase()) ||
@@ -503,23 +740,63 @@ export default function InspectionManagementPage() {
           `${inspector.firstName} ${inspector.lastName}`.toLowerCase().includes(search.toLowerCase())
         );
 
-      const matchesStatus = statusFilter === 'Todos' || inspection.status === statusFilter;      
-      const dependencyKey = getDependencyKey(inspection);
-      const matchesDependency = dependencyFilter === 'Todos' || dependencyKey === dependencyFilter;
-
-      const result = matchesSearch && matchesStatus && matchesDependency;
-      if (!result) {
-        console.log('Filtro fallido para inspección', inspection.procedureNumber, {
-          matchesSearch, matchesStatus, matchesDependency,
-          status: inspection.status, dependencyKey
-        });
+      // Filtro de dependencias usando dependencia efectiva
+      const effectiveKey = getEffectiveDependencyKey(inspection);
+      let matchesDependency = false;
+      if (dependencyFilter === 'Todos') {
+        matchesDependency = true;
+      } else {
+        // Coincidencia si seleccionan la clave directa o el nombre exacto devuelto por el backend
+        if (effectiveKey === dependencyFilter || inspection.dependency === dependencyFilter) {
+          matchesDependency = true;
+        } else {
+          // Coincidencia por label del config (por ejemplo 'Alcaldía' vs 'MayorOffice')
+          const labelForEffective = dependencyConfig[effectiveKey]?.label;
+          if (labelForEffective && labelForEffective === dependencyFilter) {
+            matchesDependency = true;
+          }
+        }
       }
-      return result;
+        
+      const matchesStatus = statusFilter === 'Todos' || normalizeStatus(inspection.status) === statusFilter;
+      
+      const passes = matchesSearch && matchesStatus && matchesDependency;
+      
+      if (dependencyFilter !== 'Todos') {
+        console.log(`Inspection ${inspection.procedureNumber}:`);
+        console.log(`  raw dependency: "${inspection.dependency}" | effective: "${effectiveKey}"`);
+        console.log(`  matchesDependency: ${matchesDependency}`);
+        console.log(`  passes filter: ${passes}`);
+      }
+      
+      return passes;
     });
-    
-    console.log('Inspecciones filtradas:', filtered.length);
-    return filtered;
   }, [inspections, search, statusFilter, dependencyFilter]);
+
+  // Slice paginado de tarjetas
+  const pageCount = Math.max(1, Math.ceil(filteredInspections.length / ITEMS_PER_PAGE));
+  const pagedInspections = useMemo(() => {
+    const start = (page - 1) * ITEMS_PER_PAGE;
+    return filteredInspections.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredInspections, page]);
+
+  // Cálculo de métricas
+  const metrics = useMemo(() => {
+    const total = inspections.length;
+    const byStatus = {
+      nuevo: inspections.filter(i => normalizeStatus(i.status) === InspectionStatus.NUEVO).length,
+      enProceso: inspections.filter(i => normalizeStatus(i.status) === InspectionStatus.EN_PROCESO).length,
+      revisado: inspections.filter(i => normalizeStatus(i.status) === InspectionStatus.REVISADO).length,
+      archivado: inspections.filter(i => normalizeStatus(i.status) === InspectionStatus.ARCHIVADO).length,
+    };
+    
+    const criticos = inspections.filter(i => {
+      const daysSinceCreated = Math.floor((new Date() - new Date(i.createdAt)) / (1000 * 60 * 60 * 24));
+      return daysSinceCreated > 7 && normalizeStatus(i.status) === InspectionStatus.NUEVO;
+    }).length;
+
+    return { total, ...byStatus, criticos };
+  }, [inspections]);
 
   // Funciones de manejo
   const handleViewInspection = (inspection) => {
@@ -528,12 +805,24 @@ export default function InspectionManagementPage() {
   };
 
   const handleStatusChange = async (inspectionId, newStatus) => {
+    // Marcar como loading
+    setLoadingStates(prev => ({ ...prev, [inspectionId]: true }));
+    
+    console.log('handleStatusChange called with:', { inspectionId, newStatus, statusType: typeof newStatus });
+    
     try {
-      await updateInspection(inspectionId, { status: newStatus });
-      setIsModalOpen(false);
-      setSelectedInspection(null);
+      await updateInspectionStatus(inspectionId, newStatus);
+      // El estado se actualizará automáticamente por el hook useInspections
     } catch (error) {
       console.error('Error updating inspection status:', error);
+      // Aquí podrías mostrar una notificación de error
+    } finally {
+      // Remover el estado de loading
+      setLoadingStates(prev => {
+        const newStates = { ...prev };
+        delete newStates[inspectionId];
+        return newStates;
+      });
     }
   };
 
@@ -574,58 +863,256 @@ export default function InspectionManagementPage() {
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen space-y-6">
-      {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Gestión de Inspecciones</h1>
-        <p className="text-gray-600 mt-1">Administra los trámites de inspección recibidos</p>
-      </div>
+    <div className="p-6 bg-gray-50 min-h-screen">
+      <div className="space-y-6">
+        {/* Header */}
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Gestión de Inspecciones</h1>
+          <p className="text-gray-600 mt-1">Panel de control para administrar trámites de inspección</p>
+        </div>
 
-      {/* Filtros */}
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col lg:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Buscar por número de trámite, dirección o inspector..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <div className="flex gap-2">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {statuses.map(status => (
-                  <option key={status} value={status}>
-                    {status === 'Todos' ? 'Todos los estados' : statusConfig[status]?.label || status}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={dependencyFilter}
-                onChange={(e) => setDependencyFilter(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                {dependencies.map(dep => (
-                  <option key={dep} value={dep}>
-                    {dep === 'Todos' ? 'Todas las dependencias' : dependencyConfig[dep]?.label || dep}
-                  </option>
-                ))}
-              </select>
+        {/* Filtros Modernos */}
+        <div className="relative bg-white rounded-2xl shadow-lg border border-gray-200 ring-1 ring-gray-200/70 overflow-hidden">
+          {/* Accent bar */}
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500" />
+          {/* Header de Filtros */}
+          <div className="bg-gradient-to-r from-slate-100 to-gray-100 px-8 py-6 border-b border-gray-200">
+            <div className="flex flex-col lg:flex-row gap-6 items-start lg:items-center justify-between">
+              {/* Barra de búsqueda mejorada */}
+              <div className="relative flex-1 max-w-lg">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <Input
+                  type="text"
+                  placeholder="Buscar trámites por número, dirección, inspector..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-11 pr-4 py-3 w-full border-gray-200 rounded-xl shadow-sm focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white"
+                />
+              </div>
+
+              {/* Filtro de Dependencias mejorado */}
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-700">
+                  <Building className="w-4 h-4 text-gray-500" />
+                  <span>Dependencia:</span>
+                </div>
+                <select
+                  value={dependencyFilter}
+                  onChange={(e) => setDependencyFilter(e.target.value)}
+                  className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-sm font-medium min-w-[200px] shadow-sm"
+                >
+                  {availableDependencies.map((dep) => (
+                    <option key={dep} value={dep}>
+                      {dep === 'Todos' ? 'Todas las dependencias' : dep}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
 
-      {/* Lista de inspecciones */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {filteredInspections.map((inspection) => {
-          const dependencyKey = getDependencyKey(inspection);
+          {/* Tabs de Estado Mejorados */}
+          <div className="px-8 py-6">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                <span className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Filtrar por Estado</span>
+              </div>
+            </div>
+            
+            <div className="flex flex-wrap gap-3">
+              <button
+                onClick={() => {
+                  setStatusFilter('Todos');
+                }}
+                className={`group relative px-6 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 ${
+                  statusFilter === 'Todos'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-lg shadow-blue-500/25'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${
+                    statusFilter === 'Todos'
+                      ? 'bg-white/20' 
+                      : 'bg-blue-100 group-hover:bg-blue-200'
+                  }`}>
+                    <BarChart3 className={`w-4 h-4 ${
+                      statusFilter === 'Todos' ? 'text-white' : 'text-blue-600'
+                    }`} />
+                  </div>
+                  <span>Todos</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    statusFilter === 'Todos'
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-100 text-gray-600 group-hover:bg-blue-100 group-hover:text-blue-700'
+                  }`}>
+                    {metrics.total}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setStatusFilter(InspectionStatus.NUEVO);
+                }}
+                className={`group relative px-6 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 ${
+                  statusFilter === InspectionStatus.NUEVO
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-500 text-white shadow-lg shadow-amber-500/25'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-amber-300 hover:bg-amber-50 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${
+                    statusFilter === InspectionStatus.NUEVO
+                      ? 'bg-white/20' 
+                      : 'bg-amber-100 group-hover:bg-amber-200'
+                  }`}>
+                    <AlertTriangle className={`w-4 h-4 ${
+                      statusFilter === InspectionStatus.NUEVO ? 'text-white' : 'text-amber-600'
+                    }`} />
+                  </div>
+                  <span>Pendientes</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    statusFilter === InspectionStatus.NUEVO
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-100 text-gray-600 group-hover:bg-amber-100 group-hover:text-amber-700'
+                  }`}>
+                    {metrics.nuevo}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setStatusFilter(InspectionStatus.EN_PROCESO);
+                }}
+                className={`group relative px-6 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 ${
+                  statusFilter === InspectionStatus.EN_PROCESO
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 text-white shadow-lg shadow-orange-500/25'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-orange-300 hover:bg-orange-50 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${
+                    statusFilter === InspectionStatus.EN_PROCESO
+                      ? 'bg-white/20' 
+                      : 'bg-orange-100 group-hover:bg-orange-200'
+                  }`}>
+                    <Play className={`w-4 h-4 ${
+                      statusFilter === InspectionStatus.EN_PROCESO ? 'text-white' : 'text-orange-600'
+                    }`} />
+                  </div>
+                  <span>En Proceso</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    statusFilter === InspectionStatus.EN_PROCESO
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-100 text-gray-600 group-hover:bg-orange-100 group-hover:text-orange-700'
+                  }`}>
+                    {metrics.enProceso}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setStatusFilter(InspectionStatus.REVISADO);
+                }}
+                className={`group relative px-6 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 ${
+                  statusFilter === InspectionStatus.REVISADO
+                    ? 'bg-gradient-to-r from-emerald-500 to-green-500 text-white shadow-lg shadow-emerald-500/25'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-emerald-300 hover:bg-emerald-50 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${
+                    statusFilter === InspectionStatus.REVISADO
+                      ? 'bg-white/20' 
+                      : 'bg-emerald-100 group-hover:bg-emerald-200'
+                  }`}>
+                    <CheckCircle className={`w-4 h-4 ${
+                      statusFilter === InspectionStatus.REVISADO ? 'text-white' : 'text-emerald-600'
+                    }`} />
+                  </div>
+                  <span>Resueltos</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    statusFilter === InspectionStatus.REVISADO
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-100 text-gray-600 group-hover:bg-emerald-100 group-hover:text-emerald-700'
+                  }`}>
+                    {metrics.revisado}
+                  </span>
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setStatusFilter(InspectionStatus.ARCHIVADO);
+                }}
+                className={`group relative px-6 py-3.5 rounded-2xl font-semibold text-sm transition-all duration-300 transform hover:scale-105 ${
+                  statusFilter === InspectionStatus.ARCHIVADO
+                    ? 'bg-gradient-to-r from-slate-500 to-gray-600 text-white shadow-lg shadow-slate-500/25'
+                    : 'bg-white text-gray-600 border-2 border-gray-200 hover:border-slate-300 hover:bg-slate-50 shadow-sm'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-1.5 rounded-lg ${
+                    statusFilter === InspectionStatus.ARCHIVADO
+                      ? 'bg-white/20' 
+                      : 'bg-slate-100 group-hover:bg-slate-200'
+                  }`}>
+                    <Archive className={`w-4 h-4 ${
+                      statusFilter === InspectionStatus.ARCHIVADO ? 'text-white' : 'text-slate-600'
+                    }`} />
+                  </div>
+                  <span>Archivados</span>
+                  <span className={`px-2.5 py-1 rounded-full text-xs font-bold ${
+                    statusFilter === InspectionStatus.ARCHIVADO
+                      ? 'bg-white/20 text-white'
+                      : 'bg-gray-100 text-gray-600 group-hover:bg-slate-100 group-hover:text-slate-700'
+                  }`}>
+                    {metrics.archivado}
+                  </span>
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Lista de inspecciones - Con más espaciado */}
+        <div className="mt-12">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">
+              Trámites de Inspección
+            </h2>
+            <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
+          </div>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
+            {pagedInspections.map((inspection) => {
+          // Determinar la dependencia basada en los datos disponibles
+          let dependencyKey = inspection.dependency;
+          
+          // Si no hay dependency directo, determinarlo por los campos presentes
+          if (!dependencyKey) {
+            if (inspection.mayorOffice) {
+              dependencyKey = 'MayorOffice';
+            } else if (inspection.landUse || inspection.antiquity || inspection.pcCancellation || inspection.generalInspection || inspection.workReceipt) {
+              dependencyKey = 'Constructions';
+            } else if (inspection.concession) {
+              dependencyKey = 'MaritimeZone';
+            } else if (inspection.realEstate) {
+              dependencyKey = 'RealEstate';
+            } else if (inspection.collections) {
+              dependencyKey = 'Collections';
+            } else if (inspection.taxesAndLicenses) {
+              dependencyKey = 'TaxesAndLicenses';
+            } else if (inspection.servicePlatform) {
+              dependencyKey = 'ServicePlatform';
+            }
+          }
           
           const dependencyInfo = dependencyConfig[dependencyKey] || {
             borderColor: '#6b7280', // gray-500
@@ -635,7 +1122,7 @@ export default function InspectionManagementPage() {
             icon: Building
           };
           const DependencyIcon = dependencyInfo.icon;
-          const statusInfo = statusConfig[inspection.status] || statusConfig['Nuevo'];
+          const statusInfo = getStatusConfig(inspection.status);
           
           return (
             <Card 
@@ -720,7 +1207,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.landUse && (
                     <div className="flex items-center gap-2">
-                      <MapPin className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         Uso de Suelo - {inspection.landUse.requestedUse}
                       </span>
@@ -729,7 +1216,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.antiquity && (
                     <div className="flex items-center gap-2">
-                      <History className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         Antigüedad - Finca #{inspection.antiquity.propertyNumber}
                       </span>
@@ -738,7 +1225,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.pcCancellation && (
                     <div className="flex items-center gap-2">
-                      <XCircle className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         Anulación PC - #{inspection.pcCancellation.pcNumber}
                       </span>
@@ -747,7 +1234,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.generalInspection && (
                     <div className="flex items-center gap-2">
-                      <ClipboardCheck className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         Inspección General - Finca #{inspection.generalInspection.propertyNumber}
                       </span>
@@ -756,7 +1243,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.workReceipt && (
                     <div className="flex items-center gap-2">
-                      <Hammer className="w-4 h-4 text-gray-400" />
+                      <Building className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         Recibido de Obra - {inspection.workReceipt.state}
                       </span>
@@ -765,7 +1252,7 @@ export default function InspectionManagementPage() {
                   
                   {inspection.concession && (
                     <div className="flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-gray-400" />
+                      <MapPin className="w-4 h-4 text-gray-400" />
                       <span className="text-sm text-gray-600">
                         {inspection.concession.concessionType} - Exp. #{inspection.concession.fileNumber}
                       </span>
@@ -794,16 +1281,16 @@ export default function InspectionManagementPage() {
                   </div>
                 )}
 
-                {/* Botón de ver detalles */}
-                <div className="flex justify-end">
+                {/* Acción única: Ver más */}
+                <div className="flex justify-end items-center">
                   <Button
                     onClick={() => handleViewInspection(inspection)}
                     variant="outline"
                     size="sm"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="text-xs px-2 py-1 h-8"
                   >
-                    <Eye className="w-4 h-4 mr-2" />
-                    Ver detalles
+                    <Eye className="w-3 h-3 mr-1" />
+                    Ver más
                   </Button>
                 </div>
               </CardContent>
@@ -826,6 +1313,19 @@ export default function InspectionManagementPage() {
         </div>
       )}
 
+      {/* Paginación */}
+      {filteredInspections.length > ITEMS_PER_PAGE && (
+        <div className="mt-8">
+          <React.Suspense fallback={<div className="flex justify-center text-sm text-gray-500">Cargando paginación…</div>}>
+            <Pagination
+              page={page}
+              pageCount={pageCount}
+              onPageChange={(p) => setPage(p)}
+            />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* Modal de detalles */}
       <InspectionDetailModal
         inspection={selectedInspection}
@@ -836,6 +1336,8 @@ export default function InspectionManagementPage() {
         }}
         onStatusChange={handleStatusChange}
       />
+        </div>
+      </div>
     </div>
   );
 }

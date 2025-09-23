@@ -41,6 +41,13 @@ export const inspectionsService = {
   getInspectionById: (id) => request(`/inspections/${id}`),
   createInspection: (dto) => request('/inspections', { method: 'POST', body: dto }),
   updateInspection: (id, body) => request(`/inspections/${id}`, { method: 'PATCH', body }),
+  updateInspectionStatus: (id, status) => {
+    console.log('Sending status update:', { id, status, statusType: typeof status });
+    return request(`/inspections/${id}/status`, { 
+      method: 'PATCH', 
+      body: { status } 
+    });
+  },
   deleteInspection: (id) => request(`/inspections/${id}`, { method: 'DELETE' }),
 
   uploadPhotos: async (inspectionId, files = [], { section = 'general' } = {}) => {
