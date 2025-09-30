@@ -389,10 +389,10 @@ export default function InspectionForm() {
   // MayorOffice photos ahora usan campos de subida (mo1, mo2, mo3)
   // ZMT photos ahora usan campos de subida (zmt1, zmt2, zmt3)
 
-  // ZMT Parcels
+  // ZMT Parcels - Multiple parcels support
   const generateParcelId = () => `parcel-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const emptyParcel = { id: generateParcelId(), planType: "", planNumber: "", area: "", mojonType: "Físico", planComplies: "si", respectsBoundary: "si", anchorageMojones: "", topography: "", topographyOther: "", fenceTypes: "", fencesInvadePublic: "no", roadHasPublicAccess: "si", roadDescription: "", roadLimitations: "", roadMatchesPlan: "si", rightOfWayWidth: "" };
-  const [parcel, setParcel] = useState({ ...emptyParcel });
+  const [parcels, setParcels] = useState([{ ...emptyParcel }]);
 
   const today = useMemo(() => new Date().toISOString().split("T")[0], []);
 
@@ -474,8 +474,25 @@ export default function InspectionForm() {
   const [showStepErrors, setShowStepErrors] = useState({ 1: false, 2: false, 3: false, 4: false });
 
   // Función helper para manejar cambios en parcelas de manera segura
-  const updateParcel = useCallback((field, value) => {
-    setParcel(prevParcel => ({ ...prevParcel, [field]: value }));
+  const updateParcel = useCallback((parcelId, field, value) => {
+    setParcels(prevParcels => 
+      prevParcels.map(parcel => 
+        parcel.id === parcelId 
+          ? { ...parcel, [field]: value }
+          : parcel
+      )
+    );
+  }, []);
+
+  // Función para agregar una nueva parcela
+  const addParcel = useCallback(() => {
+    const newParcel = { ...emptyParcel, id: generateParcelId() };
+    setParcels(prevParcels => [...prevParcels, newParcel]);
+  }, []);
+
+  // Función para remover una parcela
+  const removeParcel = useCallback((parcelId) => {
+    setParcels(prevParcels => prevParcels.filter(parcel => parcel.id !== parcelId));
   }, []);
 
   useEffect(() => {
@@ -1113,309 +1130,367 @@ export default function InspectionForm() {
         <CardHeader>
           <CardTitle className="text-lg text-blue-700 flex items-center gap-2">
             <MapPin className="w-5 h-5" />
-            Parcela
+            Parcelas
           </CardTitle>
+          <div className="flex justify-between items-center">
+            <p className="text-sm text-slate-600 mt-1">Información de las parcelas de la concesión</p>
+            <Button 
+              type="button" 
+              onClick={addParcel} 
+              className="bg-blue-600 hover:bg-blue-700 text-white text-sm px-3 py-1 h-8"
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              Agregar Parcela
+            </Button>
+          </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <Card key={parcel.id} className="border border-slate-200">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base text-slate-700">Información de la Parcela</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-                {/* Información básica de la parcela */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="planType" className="text-sm font-medium">Tipo de plano *</Label>
-                    <Input
-                      id="planType"
-                      defaultValue={parcel.planType ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('planType', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Ej. Catastral"
-                      data-parcel-input
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="planNumber" className="text-sm font-medium">Número de plano *</Label>
-                    <Input
-                      id="planNumber"
-                      defaultValue={parcel.planNumber ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('planNumber', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Ej. 123-45"
-                      data-parcel-input
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="area" className="text-sm font-medium">Área (decimal) *</Label>
-                    <Input
-                      id="area"
-                      defaultValue={parcel.area ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('area', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Ej. 250.5"
-                      data-parcel-input
-                    />
-                  </div>
+          {parcels.map((parcel, index) => (
+            <Card key={parcel.id} className="border border-slate-200">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-center">
+                  <CardTitle className="text-base text-slate-700">
+                    Parcela #{index + 1}
+                  </CardTitle>
+                  {parcels.length > 1 && (
+                    <Button 
+                      type="button" 
+                      onClick={() => removeParcel(parcel.id)} 
+                      variant="outline" 
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  )}
                 </div>
-
-                {/* Tipo de mojón */}
-                <div>
-                  <Label htmlFor="mojonType" className="text-sm font-medium">Tipo de mojón *</Label>
-                  <select
-                    id="mojonType"
-                    className="w-full border border-slate-200 rounded-lg p-3 mt-1"
-                    value={parcel.mojonType}
-                    onChange={(e) => {
-                      updateParcel('mojonType', e.target.value);
-                    }}
-                    data-parcel-input
-                  >
-                    <option value="Físico">Físico</option>
-                    <option value="Poste">Poste</option>
-                    <option value="Pintado">Pintado</option>
-                    <option value="Otro">Otro</option>
-                  </select>
-                </div>
-
-                {/* Verificaciones */}
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm font-medium">Plano cumple *</Label>
-                    <div className="flex gap-4 mt-2">
-                      <Label htmlFor="planComplies-si" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="planComplies-si"
-                          checked={parcel.planComplies === "si"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('planComplies', checked ? "si" : "no");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        Sí
-                      </Label>
-                      <Label htmlFor="planComplies-no" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="planComplies-no"
-                          checked={parcel.planComplies === "no"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('planComplies', checked ? "no" : "si");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        No
-                      </Label>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                  {/* Información básica de la parcela */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div>
+                      <Label htmlFor={`planType-${parcel.id}`} className="text-sm font-medium">Tipo de plano *</Label>
+                      <Input
+                        id={`planType-${parcel.id}`}
+                        defaultValue={parcel.planType ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'planType', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Ej. Catastral"
+                        data-parcel-input
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`planNumber-${parcel.id}`} className="text-sm font-medium">Número de plano *</Label>
+                      <Input
+                        id={`planNumber-${parcel.id}`}
+                        defaultValue={parcel.planNumber ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'planNumber', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Ej. 123-45"
+                        data-parcel-input
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`area-${parcel.id}`} className="text-sm font-medium">Área (decimal) *</Label>
+                      <Input
+                        id={`area-${parcel.id}`}
+                        defaultValue={parcel.area ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'area', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Ej. 250.5"
+                        data-parcel-input
+                      />
                     </div>
                   </div>
 
+                  {/* Tipo de mojón */}
                   <div>
-                    <Label className="text-sm font-medium">Respeta lindero *</Label>
-                    <div className="flex gap-4 mt-2">
-                      <Label htmlFor="respectsBoundary-si" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="respectsBoundary-si"
-                          checked={parcel.respectsBoundary === "si"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('respectsBoundary', checked ? "si" : "no");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        Sí
-                      </Label>
-                      <Label htmlFor="respectsBoundary-no" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="respectsBoundary-no"
-                          checked={parcel.respectsBoundary === "no"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('respectsBoundary', checked ? "no" : "si");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        No
-                      </Label>
+                    <Label htmlFor={`mojonType-${parcel.id}`} className="text-sm font-medium">Tipo de mojón *</Label>
+                    <select
+                      id={`mojonType-${parcel.id}`}
+                      className="w-full border border-slate-200 rounded-lg p-3 mt-1"
+                      value={parcel.mojonType}
+                      onChange={(e) => {
+                        updateParcel(parcel.id, 'mojonType', e.target.value);
+                      }}
+                      data-parcel-input
+                    >
+                      <option value="Físico">Físico</option>
+                      <option value="Poste">Poste</option>
+                      <option value="Pintado">Pintado</option>
+                      <option value="Otro">Otro</option>
+                    </select>
+                  </div>
+
+                  {/* Verificaciones */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm font-medium">Plano cumple *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Label htmlFor={`planComplies-si-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`planComplies-si-${parcel.id}`}
+                            checked={parcel.planComplies === "si"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'planComplies', checked ? "si" : "no");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          Sí
+                        </Label>
+                        <Label htmlFor={`planComplies-no-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`planComplies-no-${parcel.id}`}
+                            checked={parcel.planComplies === "no"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'planComplies', checked ? "no" : "si");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          No
+                        </Label>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Información técnica */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="anchorageMojones" className="text-sm font-medium">Anclaje de mojones *</Label>
-                    <Input
-                      id="anchorageMojones"
-                      defaultValue={parcel.anchorageMojones ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('anchorageMojones', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Ej. Concreto"
-                      data-parcel-input
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="topography" className="text-sm font-medium">Topografía *</Label>
-                    <Input
-                      id="topography"
-                      defaultValue={parcel.topography ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('topography', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Plano / Rugoso / ..."
-                      data-parcel-input
-                    />
-                  </div>
-                </div>
-
-                {/* Información adicional */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="topographyOther" className="text-sm font-medium">Topografía (otra)</Label>
-                    <Input
-                      id="topographyOther"
-                      defaultValue={parcel.topographyOther ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('topographyOther', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder="Especificar si es otra"
-                      data-parcel-input
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="fenceTypes" className="text-sm font-medium">Tipos de cercas (coma)</Label>
-                    <Input
-                      id="fenceTypes"
-                      defaultValue={parcel.fenceTypes ?? ""}
-                      onBlur={(e) => {
-                        updateParcel('fenceTypes', e.target.value);
-                      }}
-                      className="mt-1"
-                      placeholder='Ej. "Alambrado, Madera"'
-                      data-parcel-input
-                    />
-                  </div>
-                </div>
-
-                {/* Verificaciones finales */}
-                <div className="space-y-3">
-                  <div>
-                    <Label className="text-sm font-medium">Cercas invaden DP *</Label>
-                    <div className="flex gap-4 mt-2">
-                      <Label htmlFor="fencesInvadePublic-no" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="fencesInvadePublic-no"
-                          checked={parcel.fencesInvadePublic === "no"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('fencesInvadePublic', checked ? "no" : "si");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        No
-                      </Label>
-                      <Label htmlFor="fencesInvadePublic-si" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="fencesInvadePublic-si"
-                          checked={parcel.fencesInvadePublic === "si"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('fencesInvadePublic', checked ? "si" : "no");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        Sí
-                      </Label>
+                    <div>
+                      <Label className="text-sm font-medium">Respeta lindero *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Label htmlFor={`respectsBoundary-si-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`respectsBoundary-si-${parcel.id}`}
+                            checked={parcel.respectsBoundary === "si"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'respectsBoundary', checked ? "si" : "no");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          Sí
+                        </Label>
+                        <Label htmlFor={`respectsBoundary-no-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`respectsBoundary-no-${parcel.id}`}
+                            checked={parcel.respectsBoundary === "no"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'respectsBoundary', checked ? "no" : "si");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          No
+                        </Label>
+                      </div>
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-sm font-medium">Vía con acceso público *</Label>
-                    <div className="flex gap-4 mt-2">
-                      <Label htmlFor="roadHasPublicAccess-si" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="roadHasPublicAccess-si"
-                          checked={parcel.roadHasPublicAccess === "si"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('roadHasPublicAccess', checked ? "si" : "no");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        Sí
-                      </Label>
-                      <Label htmlFor="roadHasPublicAccess-no" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="roadHasPublicAccess-no"
-                          checked={parcel.roadHasPublicAccess === "no"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('roadHasPublicAccess', checked ? "no" : "si");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        No
-                      </Label>
+                  {/* Información técnica */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`anchorageMojones-${parcel.id}`} className="text-sm font-medium">Anclaje de mojones *</Label>
+                      <Input
+                        id={`anchorageMojones-${parcel.id}`}
+                        defaultValue={parcel.anchorageMojones ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'anchorageMojones', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Ej. Concreto"
+                        data-parcel-input
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`topography-${parcel.id}`} className="text-sm font-medium">Topografía *</Label>
+                      <Input
+                        id={`topography-${parcel.id}`}
+                        defaultValue={parcel.topography ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'topography', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Plano / Rugoso / ..."
+                        data-parcel-input
+                      />
                     </div>
                   </div>
 
-                  <div>
-                    <Label className="text-sm font-medium">¿Vía coincide con plano? *</Label>
-                    <div className="flex gap-4 mt-2">
-                      <Label htmlFor="roadMatchesPlan-si" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="roadMatchesPlan-si"
-                          checked={parcel.roadMatchesPlan === "si"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('roadMatchesPlan', checked ? "si" : "no");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        Sí
-                      </Label>
-                      <Label htmlFor="roadMatchesPlan-no" className="flex items-center gap-2 cursor-pointer">
-                        <Checkbox
-                          id="roadMatchesPlan-no"
-                          checked={parcel.roadMatchesPlan === "no"}
-                          onCheckedChange={(checked) => {
-                            updateParcel('roadMatchesPlan', checked ? "no" : "si");
-                          }}
-                          className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
-                          data-parcel-input
-                        />
-                        No
-                      </Label>
+                  {/* Información adicional */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`topographyOther-${parcel.id}`} className="text-sm font-medium">Topografía (otra)</Label>
+                      <Input
+                        id={`topographyOther-${parcel.id}`}
+                        defaultValue={parcel.topographyOther ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'topographyOther', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Especificar si es otra"
+                        data-parcel-input
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`fenceTypes-${parcel.id}`} className="text-sm font-medium">Tipos de cercas (coma)</Label>
+                      <Input
+                        id={`fenceTypes-${parcel.id}`}
+                        defaultValue={parcel.fenceTypes ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'fenceTypes', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder='Ej. "Alambrado, Madera"'
+                        data-parcel-input
+                      />
                     </div>
                   </div>
-                </div>
 
-                {/* Ancho de servidumbre */}
-                <div>
-                  <Label htmlFor="rightOfWayWidth" className="text-sm font-medium">Ancho de servidumbre</Label>
-                  <Input
-                    id="rightOfWayWidth"
-                    defaultValue={parcel.rightOfWayWidth ?? ""}
-                    onBlur={(e) => {
-                      updateParcel('rightOfWayWidth', e.target.value);
-                    }}
-                    className="mt-1"
-                    placeholder="Ej. 10 metros"
-                    data-parcel-input
-                  />
-                </div>
-              </CardContent>
-            </Card>
+                  {/* Verificaciones finales */}
+                  <div className="space-y-3">
+                    <div>
+                      <Label className="text-sm font-medium">Cercas invaden DP *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Label htmlFor={`fencesInvadePublic-no-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`fencesInvadePublic-no-${parcel.id}`}
+                            checked={parcel.fencesInvadePublic === "no"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'fencesInvadePublic', checked ? "no" : "si");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          No
+                        </Label>
+                        <Label htmlFor={`fencesInvadePublic-si-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`fencesInvadePublic-si-${parcel.id}`}
+                            checked={parcel.fencesInvadePublic === "si"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'fencesInvadePublic', checked ? "si" : "no");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          Sí
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">Vía con acceso público *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Label htmlFor={`roadHasPublicAccess-si-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`roadHasPublicAccess-si-${parcel.id}`}
+                            checked={parcel.roadHasPublicAccess === "si"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'roadHasPublicAccess', checked ? "si" : "no");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          Sí
+                        </Label>
+                        <Label htmlFor={`roadHasPublicAccess-no-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`roadHasPublicAccess-no-${parcel.id}`}
+                            checked={parcel.roadHasPublicAccess === "no"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'roadHasPublicAccess', checked ? "no" : "si");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          No
+                        </Label>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label className="text-sm font-medium">¿Vía coincide con plano? *</Label>
+                      <div className="flex gap-4 mt-2">
+                        <Label htmlFor={`roadMatchesPlan-si-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`roadMatchesPlan-si-${parcel.id}`}
+                            checked={parcel.roadMatchesPlan === "si"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'roadMatchesPlan', checked ? "si" : "no");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          Sí
+                        </Label>
+                        <Label htmlFor={`roadMatchesPlan-no-${parcel.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Checkbox
+                            id={`roadMatchesPlan-no-${parcel.id}`}
+                            checked={parcel.roadMatchesPlan === "no"}
+                            onCheckedChange={(checked) => {
+                              updateParcel(parcel.id, 'roadMatchesPlan', checked ? "no" : "si");
+                            }}
+                            className="data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-600"
+                            data-parcel-input
+                          />
+                          No
+                        </Label>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Información de vía */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <Label htmlFor={`roadDescription-${parcel.id}`} className="text-sm font-medium">Descripción de vía</Label>
+                      <Input
+                        id={`roadDescription-${parcel.id}`}
+                        defaultValue={parcel.roadDescription ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'roadDescription', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Descripción de la vía"
+                        data-parcel-input
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor={`roadLimitations-${parcel.id}`} className="text-sm font-medium">Limitaciones de vía</Label>
+                      <Input
+                        id={`roadLimitations-${parcel.id}`}
+                        defaultValue={parcel.roadLimitations ?? ""}
+                        onBlur={(e) => {
+                          updateParcel(parcel.id, 'roadLimitations', e.target.value);
+                        }}
+                        className="mt-1"
+                        placeholder="Limitaciones observadas"
+                        data-parcel-input
+                      />
+                    </div>
+                  </div>
+
+                  {/* Ancho de servidumbre */}
+                  <div>
+                    <Label htmlFor={`rightOfWayWidth-${parcel.id}`} className="text-sm font-medium">Ancho de servidumbre</Label>
+                    <Input
+                      id={`rightOfWayWidth-${parcel.id}`}
+                      defaultValue={parcel.rightOfWayWidth ?? ""}
+                      onBlur={(e) => {
+                        updateParcel(parcel.id, 'rightOfWayWidth', e.target.value);
+                      }}
+                      className="mt-1"
+                      placeholder="Ej. 10 metros"
+                      data-parcel-input
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
         </CardContent>
       </Card>
 
@@ -1525,7 +1600,7 @@ export default function InspectionForm() {
         expiresAt: values.zc_expiresAt || null,
         observations: values.zc_observations || null,
         photos: [],
-        parcels: [{
+        parcels: parcels.map(parcel => ({
           planType: parcel.planType,
           planNumber: parcel.planNumber,
           area: parcel.area ? String(parcel.area) : "0",
@@ -1542,7 +1617,7 @@ export default function InspectionForm() {
           roadLimitations: parcel.roadLimitations || "",
           roadMatchesPlan: parcel.roadMatchesPlan,
           rightOfWayWidth: parcel.rightOfWayWidth || "",
-        }],
+        })),
       } : undefined;
 
       // Parse and normalize userIds
@@ -1625,7 +1700,7 @@ export default function InspectionForm() {
         zmt1: null, zmt2: null, zmt3: null,
       });
       setPhotoErrors({});
-      setParcel({ ...emptyParcel });
+      setParcels([{ ...emptyParcel }]);
 
       // Mostrar SweetAlert de éxito con timer
       await Swal.fire({

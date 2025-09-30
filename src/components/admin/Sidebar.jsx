@@ -1,8 +1,8 @@
 // src/AdministrativePage/components/Sidebar.jsx
 "use client"
 
-import React, { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
+import React, { useState, useEffect } from 'react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../../hooks/useAuth'
 import {
   Menu,
@@ -14,13 +14,28 @@ import {
   LogOut,
   User,
   FileText,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  List,
+  BarChart3,
 } from 'lucide-react'
 
 export default function Sidebar() {
   const [open, setOpen] = useState(false)
+  const [inspectionsOpen, setInspectionsOpen] = useState(false)
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
   const role = (user?.role || user?.rol || '').toString().trim().toLowerCase()
+
+  // Mantener abierto el desplegable si estamos en una página de inspecciones
+  useEffect(() => {
+    const inspectionRoutes = ['/admin/inspectionsform', '/admin/inspections', '/admin/inspections-management']
+    if (inspectionRoutes.some(route => location.pathname === route)) {
+      setInspectionsOpen(true)
+    }
+  }, [location.pathname])
 
   const handleLogout = () => {
     logout()
@@ -28,18 +43,47 @@ export default function Sidebar() {
   }
 
   const allItems = [
-    { to: '/admin/dashboard',   label: 'Dashboard',    icon: <Home size={20}/>, roles: ['admin','inspector'] },
-    { to: '/admin/inspectionsform', label: 'Formulario Inspecciones', icon: <ClipboardList size={20}/>, roles: ['admin','inspector'] },
-    { to: '/admin/inspections', label: 'Inspecciones', icon: <ClipboardList size={20}/>, roles: ['admin'] },
-    { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <FileText size={20}/>, roles: ['admin'] },
-    { to: '/admin/users',        label: 'Usuarios',     icon: <Users size={20}/>, roles: ['admin'] },
-    { to: '/admin/settings',     label: 'Ajustes',      icon: <Settings size={20}/>, roles: ['admin'] },
+    { to: '/admin/dashboard', label: 'Dashboard', icon: <Home size={20}/>, roles: ['admin','inspector'] },
+    { 
+      to: null, 
+      label: 'Inspecciones-Trámite', 
+      icon: <ClipboardList size={20}/>, 
+      roles: ['admin','inspector'],
+      isDropdown: true,
+      subItems: [
+        { to: '/admin/inspectionsform', label: 'Nuevo Trámite', icon: <Plus size={18}/>, roles: ['admin','inspector'] },
+        { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <List size={18}/>, roles: ['admin'] },
+      ]
+    },
+    { to: '/admin/stats', label: 'Estadísticas', icon: <BarChart3 size={20}/>, roles: ['admin'] },
+    { to: '/admin/users', label: 'Usuarios', icon: <Users size={20}/>, roles: ['admin'] },
+    { to: '/admin/settings', label: 'Ajustes', icon: <Settings size={20}/>, roles: ['admin'] },
   ]
   const menuItems = allItems.filter(item => {
     if (role === 'admin') return true
-    if (role === 'inspector') return item.roles?.includes('inspector')
-    // por defecto, mostrar solo lo mínimo
+    if (role === 'inspector') {
+      if (item.isDropdown) {
+        // Para dropdowns, filtramos los subelementos
+        const filteredSubItems = item.subItems?.filter(subItem => 
+          subItem.roles?.includes('inspector')
+        )
+        return filteredSubItems && filteredSubItems.length > 0
+      }
+      return item.roles?.includes('inspector')
+    }
+    // por defecto, mostrar solo lo mínimo para inspectores
     return item.roles?.includes('inspector')
+  }).map(item => {
+    if (item.isDropdown && role !== 'admin') {
+      // Para inspectores, filtrar subelementos
+      return {
+        ...item,
+        subItems: item.subItems?.filter(subItem => 
+          subItem.roles?.includes('inspector')
+        )
+      }
+    }
+    return item
   })
 
   return (
@@ -83,20 +127,60 @@ export default function Sidebar() {
 
         {/* Navegación */}
         <nav className="mt-4 flex-1 overflow-y-auto">
-          {menuItems.map(({ to, label, icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              className={({ isActive }) =>
-                `flex items-center px-4 py-2 space-x-3 hover:bg-gray-100 transition-colors
-                 ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700'}`
-              }
-              onClick={() => setOpen(false)}
-            >
-              {icon}
-              <span className="font-medium">{label}</span>
-            </NavLink>
-          ))}
+          {menuItems.map((item) => {
+            if (item.isDropdown) {
+              return (
+                <div key={item.label}>
+                  {/* Elemento principal del dropdown */}
+                  <button
+                    onClick={() => setInspectionsOpen(!inspectionsOpen)}
+                    className="w-full flex items-center justify-between px-4 py-2 space-x-3 hover:bg-gray-100 transition-colors text-gray-700"
+                  >
+                    <div className="flex items-center space-x-3">
+                      {item.icon}
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    {inspectionsOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                  </button>
+                  
+                  {/* Subelementos */}
+                  {inspectionsOpen && (
+                    <div className="ml-4 border-l border-gray-200">
+                      {item.subItems?.map((subItem) => (
+                        <NavLink
+                          key={subItem.to}
+                          to={subItem.to}
+                          className={({ isActive }) =>
+                            `flex items-center pl-6 pr-4 py-2 space-x-3 hover:bg-gray-100 transition-colors
+                             ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-600'}`
+                          }
+                          onClick={() => setOpen(false)}
+                        >
+                          {subItem.icon}
+                          <span className="font-medium text-sm">{subItem.label}</span>
+                        </NavLink>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            } else {
+              return (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  className={({ isActive }) =>
+                    `flex items-center px-4 py-2 space-x-3 hover:bg-gray-100 transition-colors
+                     ${isActive ? 'bg-blue-100 text-blue-600' : 'text-gray-700'}`
+                  }
+                  onClick={() => setOpen(false)}
+                >
+                  {item.icon}
+                  <span className="font-medium">{item.label}</span>
+                </NavLink>
+              )
+            }
+          })}
         </nav>
 
         {/* Perfil y cierre */}
