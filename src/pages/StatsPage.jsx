@@ -68,9 +68,9 @@ export default function StatsPage() {
     },
     {
       id: 'departments',
-      label: 'Departamentos',
+      label: 'Dependencias',
       icon: <Building2 size={18} />,
-      description: 'Comparación entre departamentos'
+      description: 'Comparación entre dependencias'
     },
     {
       id: 'detailed',
@@ -155,7 +155,7 @@ export default function StatsPage() {
                 Estadísticas e Informes
               </h1>
               <p className="text-gray-600 mt-1">
-                Análisis completo del rendimiento del departamento de inspecciones
+                Análisis completo del rendimiento de inspecciones
               </p>
             </div>
             

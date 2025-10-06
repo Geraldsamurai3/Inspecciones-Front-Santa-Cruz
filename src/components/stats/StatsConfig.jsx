@@ -51,14 +51,14 @@ export default function StatsConfig({ onConfigChange, currentConfig = {} }) {
   ];
 
   const departmentOptions = [
-    { value: 'all', label: 'Todos los departamentos' },
+    { value: 'all', label: 'Todas las dependencias' },
     { value: 'construcciones', label: 'Construcciones' },
     { value: 'zona_maritima', label: 'Zona Marítima' },
     { value: 'alcaldia_mayor', label: 'Alcaldía Mayor' }
   ];
 
   const groupByOptions = [
-    { value: 'department', label: 'Por Departamento' },
+    { value: 'department', label: 'Por Dependencia' },
     { value: 'inspector', label: 'Por Inspector' },
     { value: 'status', label: 'Por Estado' },
     { value: 'date', label: 'Por Fecha' }
@@ -94,11 +94,11 @@ export default function StatsConfig({ onConfigChange, currentConfig = {} }) {
 
         {/* Filtros */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Departamentos */}
+          {/* Dependencias */}
           <div className="space-y-2">
             <Label className="flex items-center gap-2">
               <Building2 className="w-4 h-4" />
-              Departamentos
+              Dependencias
             </Label>
             <select
               value={config.departments[0]}

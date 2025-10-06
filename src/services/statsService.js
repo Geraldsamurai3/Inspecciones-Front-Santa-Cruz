@@ -1,5 +1,5 @@
 // src/services/statsService.js
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 class StatsService {
   constructor() {
@@ -55,7 +55,7 @@ class StatsService {
     return this.request('/stats/inspectors');
   }
 
-  // 6. GET /stats/departments - Comparación entre departamentos
+  // 6. GET /stats/departments - Comparación entre dependencias
   async getDepartments() {
     return this.request('/stats/departments');
   }
@@ -109,7 +109,7 @@ class StatsService {
 
   // Métodos adicionales para filtros específicos
   async getStatsByDepartment(departmentId) {
-    return this.request(`/stats/departments/${departmentId}`);
+    return this.request(`/stats/dependencies/${departmentId}`);
   }
 
   async getStatsByInspector(inspectorId) {
