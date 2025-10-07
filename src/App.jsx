@@ -6,7 +6,8 @@ import RequireRole from './components/RequireRole'
 import AdminLayout from './components/admin/AdminLayout'
 import UsersPage from './pages/UsersPage.jsx'
 import LoginPage from './components/auth/LoginPage.jsx'
-import DashboardPage from './pages/DashboardPage.jsx'
+import AdminDashboard from './pages/AdminDashboard.jsx'
+import InspectorDashboard from './pages/InspectorDashboard.jsx'
 import InspectionManagementPage from './pages/InspectionManagementPage.jsx'
 import ForgotPasswordPage from './pages/ForgotPasswordPage.jsx'
 import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
@@ -33,7 +34,7 @@ export default function App() {
 
           {/* Rutas accesibles para Inspectores (y Admin por herencia) */}
           <Route element={<RequireRole roles={["inspector"]} />}>
-            <Route path="/admin/dashboard" element={<DashboardPage />} />
+           <Route path="/admin/inspector-dashboard" element={<InspectorDashboard />} />
             <Route path="/admin/inspectionsform" element={<InspectionForm />} />
             <Route path="/admin/profile" element={<ProfilePage />} />
           </Route>
@@ -43,6 +44,7 @@ export default function App() {
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/inspections-management" element={<InspectionManagementPage />} />
             <Route path="/admin/stats" element={<StatsPage />} />
+            <Route path="/admin/dashboard" element={<AdminDashboard />} />
           </Route>
 
 

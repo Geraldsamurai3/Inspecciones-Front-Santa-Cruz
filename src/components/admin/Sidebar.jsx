@@ -43,7 +43,8 @@ export default function Sidebar() {
   }
 
   const allItems = [
-    { to: '/admin/dashboard', label: 'Dashboard', icon: <Home size={20}/>, roles: ['admin','inspector'] },
+    { to: '/admin/inspector-dashboard', label: 'Dashboard Inspector', icon: <FileText size={20}/>, roles: ['inspector'] },
+        { to: '/admin/admin-dashboard', label: 'Dashboard Admin', icon: <BarChart3 size={20}/>, roles: ['admin'] },
     { 
       to: null, 
       label: 'Inspecciones-Trámite', 
@@ -53,6 +54,7 @@ export default function Sidebar() {
       subItems: [
         { to: '/admin/inspectionsform', label: 'Nuevo Trámite', icon: <Plus size={18}/>, roles: ['admin','inspector'] },
         { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <List size={18}/>, roles: ['admin'] },
+        
       ]
     },
     { to: '/admin/stats', label: 'Estadísticas', icon: <BarChart3 size={20}/>, roles: ['admin'] },
