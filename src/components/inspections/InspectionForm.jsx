@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from "@/components/ui/separator";
+import { SecurityAlert } from "@/components/ui/security-alert";
 
 // lucide-react
 import {
@@ -53,6 +54,7 @@ const DEPENDENCY_OPTIONS = [
   { key: Dependency.TaxesAndLicenses, title: "Rentas y Patentes", icon: "Receipt" },
   { key: Dependency.ServicePlatform, title: "Plataformas de servicios", icon: "Monitor" },
   { key: Dependency.MaritimeZone, title: "ZMT", icon: "Waves" },
+  { key: Dependency.WorkClosure, title: "Clausura de Obra", icon: "Ban" },
 ];
 
 const CONSTRUCTION_TRAMITES = [
@@ -103,14 +105,43 @@ const PhotoField = ({ fieldKey, label, photos, setPhotos, photoErrors, setPhotoE
       setPhotoErrors((e) => ({ ...e, [fieldKey]: null }));
       return;
     }
+    
+    // Validaciones de seguridad mejoradas
     if (!ALLOWED_IMAGE.test(file.type)) {
-      setPhotoErrors((e) => ({ ...e, [fieldKey]: "Solo se permiten imágenes (JPG/PNG)." }));
+      setPhotoErrors((e) => ({ ...e, [fieldKey]: "Solo se permiten imágenes (JPG/PNG/WEBP)." }));
       return;
     }
+    
+    // Validar nombre de archivo seguro
+    if (!isFilenameSafe(file.name)) {
+      setPhotoErrors((e) => ({ ...e, [fieldKey]: "Nombre de archivo contiene caracteres no permitidos." }));
+      return;
+    }
+    
+    // Validar tipo de imagen permitido
+    if (!isAllowedImageType(file.name)) {
+      setPhotoErrors((e) => ({ ...e, [fieldKey]: "Tipo de archivo no permitido. Use JPG, PNG, WEBP o GIF." }));
+      return;
+    }
+    
+    // Validar tamaño de archivo
     if (file.size > MAX_SIZE_BYTES) {
       setPhotoErrors((e) => ({ ...e, [fieldKey]: "La imagen supera 10MB." }));
       return;
     }
+    
+    // Validar longitud del nombre de archivo
+    if (file.name.length > 255) {
+      setPhotoErrors((e) => ({ ...e, [fieldKey]: "Nombre de archivo muy largo (máximo 255 caracteres)." }));
+      return;
+    }
+    
+    // Validar que no sea un archivo vacío
+    if (file.size === 0) {
+      setPhotoErrors((e) => ({ ...e, [fieldKey]: "El archivo está vacío." }));
+      return;
+    }
+    
     setPhotoErrors((e) => ({ ...e, [fieldKey]: null }));
     setPhotos((p) => ({ ...p, [fieldKey]: file }));
   };
@@ -179,12 +210,29 @@ const RadioCard = ({ value, selected, children, htmlFor }) => (
   </Label>
 );
 
+// Importar validaciones de seguridad
+import { 
+  sanitizeString, 
+  validateEmail, 
+  validateCedula, 
+  validatePhone, 
+  validateProcedureNumber,
+  isSQLSafe,
+  isValidLength,
+  isFilenameSafe,
+  isAllowedImageType
+} from "@/utils/security-validators";
+
 /* ==========================================================================
-   Validaciones (Zod en JS)
+   Validaciones (Zod en JS) con Seguridad Mejorada
    ==========================================================================*/
 const baseSchema = z.object({
   inspectionDate: z.string().min(1, "Requerido"),
-  procedureNumber: z.string().min(1, "Requerido"),
+  procedureNumber: z.string()
+    .min(1, "Requerido")
+    .refine((val) => validateProcedureNumber(val) !== null, "Formato de número de procedimiento inválido")
+    .refine((val) => isSQLSafe(val), "Caracteres no permitidos detectados")
+    .transform((val) => sanitizeString(val)),
   applicantType: z.enum(Object.values(ApplicantType)),
   // usuarios del sistema
   userIds: z.string().refine((val) => {
@@ -196,17 +244,38 @@ const baseSchema = z.object({
     }
   }, "Seleccione al menos un usuario"),
 
-  // solicitante
-  firstName: z.string().optional(),
-  lastName1: z.string().optional(),
-  lastName2: z.string().optional(),
-  physicalId: z.string().optional(),
-  companyName: z.string().optional(),
-  legalId: z.string().optional(),
+  // solicitante - con validaciones de seguridad
+  firstName: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Caracteres no permitidos o muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
+  lastName1: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Caracteres no permitidos o muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
+  lastName2: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Caracteres no permitidos o muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
+  physicalId: z.string()
+    .optional()
+    .refine((val) => !val || validateCedula(val) !== null, "Formato de cédula inválido")
+    .transform((val) => val ? sanitizeString(val) : val),
+  legalName: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 200)), "Caracteres no permitidos o muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
+  legalId: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Formato de cédula jurídica inválido")
+    .transform((val) => val ? sanitizeString(val) : val),
 
-  // ubicación
+  // ubicación - con validaciones de seguridad
   district: z.enum(Object.values(District)),
-  exactAddress: z.string().min(1, "Ingrese la dirección"),
+  exactAddress: z.string()
+    .min(1, "Ingrese la dirección")
+    .refine((val) => isSQLSafe(val) && isValidLength(val, 500), "Dirección contiene caracteres no permitidos o es muy larga")
+    .transform((val) => sanitizeString(val)),
 
   // dependencia
   dependency: z.enum(Object.values(Dependency)).optional(),
@@ -214,42 +283,144 @@ const baseSchema = z.object({
   // constructions
   constructionProcedure: z.enum(Object.values(ConstructionProcedure)).optional(),
 
-  // Uso de suelo
-  landUseRequested: z.string().optional(),
+  // Uso de suelo - con validaciones de seguridad
+  landUseRequested: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 200)), "Texto contiene caracteres no permitidos o es muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
   landUseMatches: z.boolean().optional(),
   landUseRecommended: z.boolean().optional(),
-  landUseObservations: z.string().optional(),
+  landUseObservations: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
 
-  // Antigüedad
-  antiguedadNumeroFinca: z.string().optional(),
-  antiguedadAprox: z.string().optional(),
+  // Antigüedad - con validaciones de seguridad
+  antiguedadNumeroFinca: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número de finca contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  antiguedadAprox: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Antigüedad contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
 
-  // Anulación PC
-  pcNumeroContrato: z.string().optional(),
-  pcNumero: z.string().optional(),
+  // Anulación PC - con validaciones de seguridad
+  pcNumeroContrato: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número de contrato contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  pcNumero: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número PC contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
   pcConstruyo: z.boolean().optional(),
-  pcObservaciones: z.string().optional(),
+  pcObservaciones: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
 
-  // Inspección general
-  igNumeroFinca: z.string().optional(),
-  igObservaciones: z.string().optional(),
+  // Inspección general - con validaciones de seguridad
+  igNumeroFinca: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número de finca contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  igObservaciones: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
 
   // Recibido de obra
   roFechaVisita: z.string().optional(),
   roEstado: z.enum(["terminada", "proceso", "no_iniciada"]).optional(),
 
-  // Alcaldía
-  mo_procedureType: z.string().optional(),
-  mo_observations: z.string().optional(),
+  // Alcaldía - con validaciones de seguridad
+  mo_procedureType: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 200)), "Tipo de procedimiento contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  mo_observations: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
   mo_photos: z.array(z.string()).optional(),
 
-  // ZMT Concession
-  zc_fileNumber: z.string().optional(),
+  // ZMT Concession - con validaciones de seguridad
+  zc_fileNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número de expediente contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
   zc_concessionType: z.enum(["Nueva Concesión", "Renovación", "Modificación"]).optional(),
   zc_grantedAt: z.string().optional(),
   zc_expiresAt: z.string().optional().nullable(),
-  zc_observations: z.string().optional().nullable(),
+  zc_observations: z.string()
+    .optional()
+    .nullable()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
   zc_photos: z.array(z.string()).optional(),
+
+  // Plataformas de Servicios - con validaciones de seguridad
+  ps_procedureNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 100)), "Número de trámite contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  ps_observation: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 1000)), "Observación contiene caracteres no permitidos o es muy larga")
+    .transform((val) => val ? sanitizeString(val) : val),
+
+  // Cobros (Collections) - con validaciones de seguridad
+  col_notifierSignatureUrl: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 500)), "URL contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  col_nobodyPresent: z.boolean().optional(),
+  col_wrongAddress: z.boolean().optional(),
+  col_movedAddress: z.boolean().optional(),
+  col_refusedToSign: z.boolean().optional(),
+  col_notLocated: z.boolean().optional(),
+  col_other: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 300)), "Texto contiene caracteres no permitidos o es muy largo")
+    .transform((val) => val ? sanitizeString(val) : val),
+
+  // Clausura de Obra (Work Closure) - con validaciones de seguridad
+  wc_propertyNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Número de finca contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_cadastralNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Número de catastro contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_contractNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Número de contrato contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_permitNumber: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 50)), "Número de permiso contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_assessedArea: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 24)), "Área tasada contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_builtArea: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 24)), "Área construida contiene caracteres no permitidos")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_visitNumber: z.string().optional(),
+  wc_workReceipt: z.boolean().optional(),
+  wc_actions: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 500)), "Acciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_observations: z.string()
+    .optional()
+    .refine((val) => !val || (isSQLSafe(val) && isValidLength(val, 500)), "Observaciones contienen caracteres no permitidos o son muy largas")
+    .transform((val) => val ? sanitizeString(val) : val),
+  wc_photos: z.array(z.string()).optional(),
 });
 
 const formSchema = baseSchema.superRefine((val, ctx) => {
@@ -260,7 +431,7 @@ const formSchema = baseSchema.superRefine((val, ctx) => {
     if (!val.physicalId) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Identificación requerida", path: ["physicalId"] });
   }
   if (val.applicantType === ApplicantType.JURIDICA) {
-    if (!val.companyName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Razón social requerida", path: ["companyName"] });
+    if (!val.legalName) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Razón social requerida", path: ["legalName"] });
     if (!val.legalId) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Cédula jurídica requerida", path: ["legalId"] });
   }
 
@@ -303,6 +474,76 @@ const formSchema = baseSchema.superRefine((val, ctx) => {
     if (!val.zc_fileNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "N.º de expediente requerido", path: ["zc_fileNumber"] });
     if (!val.zc_concessionType) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Tipo de concesión requerido", path: ["zc_concessionType"] });
     if (!val.zc_grantedAt) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Fecha de otorgamiento requerida", path: ["zc_grantedAt"] });
+  }
+
+  // Validación Plataformas de Servicios
+  if (val.dependency === Dependency.ServicePlatform) {
+    if (!val.ps_procedureNumber) ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Número de trámite requerido", path: ["ps_procedureNumber"] });
+  }
+
+  // Validación Cobros (Collections)
+  if (val.dependency === Dependency.Collections) {
+    // Al menos debe tener la firma del notificador O un motivo de no firma
+    const hasSignature = val.col_notifierSignatureUrl && val.col_notifierSignatureUrl.trim() !== '';
+    const hasReason = val.col_nobodyPresent || val.col_wrongAddress || val.col_movedAddress || 
+                      val.col_refusedToSign || val.col_notLocated || 
+                      (val.col_other && val.col_other.trim() !== '');
+    
+    if (!hasSignature && !hasReason) {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: "Debe ingresar la firma del notificador o seleccionar un motivo de no firma", 
+        path: ["col_notifierSignatureUrl"] 
+      });
+    }
+  }
+
+  // Validación Clausura de Obra (Work Closure)
+  if (val.dependency === Dependency.WorkClosure) {
+    // Al menos debe tener número de finca o número de catastro
+    if (!val.wc_propertyNumber && !val.wc_cadastralNumber) {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: "Debe ingresar número de finca o número de catastro", 
+        path: ["wc_propertyNumber"] 
+      });
+    }
+    
+    // Visita es requerida
+    if (!val.wc_visitNumber) {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: "Número de visita requerido", 
+        path: ["wc_visitNumber"] 
+      });
+    }
+
+    // Acciones es requerido
+    if (!val.wc_actions || val.wc_actions.trim() === '') {
+      ctx.addIssue({ 
+        code: z.ZodIssueCode.custom, 
+        message: "Acciones requeridas", 
+        path: ["wc_actions"] 
+      });
+    }
+  }
+
+  // Validación Rentas y Patentes
+  if (val.dependency === Dependency.TaxesAndLicenses) {
+    ctx.addIssue({ 
+      code: z.ZodIssueCode.custom, 
+      message: "La funcionalidad de Rentas y Patentes aún no está disponible. Por favor, seleccione otra dependencia.", 
+      path: ["dependency"] 
+    });
+  }
+
+  // Validación Bienes Inmuebles
+  if (val.dependency === Dependency.RealEstate) {
+    ctx.addIssue({ 
+      code: z.ZodIssueCode.custom, 
+      message: "La funcionalidad de Bienes Inmuebles aún no está disponible. Por favor, seleccione otra dependencia.", 
+      path: ["dependency"] 
+    });
   }
 });
 
@@ -411,7 +652,7 @@ export default function InspectionForm() {
 
       // solicitante
       firstName: "", lastName1: "", lastName2: "", physicalId: "",
-      companyName: "", legalId: "",
+      legalName: "", legalId: "",
 
       // ubicación
       district: District.SantaCruz,
@@ -457,6 +698,32 @@ export default function InspectionForm() {
       zc_expiresAt: "",
       zc_observations: "",
       zc_photos: [],
+
+      // Plataformas de Servicios
+      ps_procedureNumber: "",
+      ps_observation: "",
+
+      // Cobros (Collection)
+      col_notifierSignatureUrl: "",
+      col_nobodyPresent: undefined,
+      col_wrongAddress: undefined,
+      col_movedAddress: undefined,
+      col_refusedToSign: undefined,
+      col_notLocated: undefined,
+      col_other: "",
+
+      // Clausura de Obra (Work Closure)
+      wc_propertyNumber: "",
+      wc_cadastralNumber: "",
+      wc_contractNumber: "",
+      wc_permitNumber: "",
+      wc_assessedArea: "",
+      wc_builtArea: "",
+      wc_visitNumber: undefined,
+      wc_workReceipt: undefined,
+      wc_actions: "",
+      wc_observations: "",
+      wc_photos: [],
     },
   });
 
@@ -495,6 +762,37 @@ export default function InspectionForm() {
     setParcels(prevParcels => prevParcels.filter(parcel => parcel.id !== parcelId));
   }, []);
 
+  // 🐛 DEBUG: Función helper para logging detallado de ZMT
+  const debugZMT = useCallback((label, data) => {
+    console.group(`🔍 DEBUG ZMT: ${label}`);
+    console.log('📊 JSON Format:', JSON.stringify(data, null, 2));
+    console.log('📋 Raw Object:', data);
+    console.groupEnd();
+  }, []);
+
+  // 🐛 DEBUG: Effect para monitorear cambios en parcels
+  useEffect(() => {
+    if (parcels.length > 0) {
+      console.group('🗺️ DEBUG: Parcels State Changed');
+      console.log(`Total parcels: ${parcels.length}`);
+      console.log('Parcels JSON:', JSON.stringify(parcels, null, 2));
+      parcels.forEach((parcel, idx) => {
+        console.log(`\n📍 Parcel ${idx + 1}:`, {
+          id: parcel.id,
+          planType: parcel.planType || '❌ EMPTY',
+          planNumber: parcel.planNumber || '❌ EMPTY',
+          area: parcel.area || '❌ EMPTY',
+          mojonType: parcel.mojonType || '❌ EMPTY',
+          planComplies: parcel.planComplies,
+          respectsBoundary: parcel.respectsBoundary,
+          topography: parcel.topography || '❌ EMPTY',
+          fenceTypes: parcel.fenceTypes || '❌ EMPTY',
+        });
+      });
+      console.groupEnd();
+    }
+  }, [parcels]);
+
   useEffect(() => {
     if (!usersLoading && users.length > 0) {
       // Map all users to the expected format: { id, name, role }
@@ -511,7 +809,7 @@ export default function InspectionForm() {
   }, [users, usersLoading]);
 
   const validateStep = async (step) => {
-    if (step === 1) return trigger(["inspectionDate", "procedureNumber", "applicantType", "userIds", ...(applicantType === ApplicantType.FISICA ? ["firstName", "lastName1", "physicalId"] : []), ...(applicantType === ApplicantType.JURIDICA ? ["companyName", "legalId"] : [])], { shouldFocus: true });
+    if (step === 1) return trigger(["inspectionDate", "procedureNumber", "applicantType", "userIds", ...(applicantType === ApplicantType.FISICA ? ["firstName", "lastName1", "physicalId"] : []), ...(applicantType === ApplicantType.JURIDICA ? ["legalName", "legalId"] : [])], { shouldFocus: true });
     if (step === 2) return trigger(["district", "exactAddress"], { shouldFocus: true });
     if (step === 3) return trigger(["dependency"], { shouldFocus: true });
     if (step === 4) {
@@ -740,8 +1038,8 @@ export default function InspectionForm() {
           <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
               <Label className="text-sm">Razón Social</Label>
-              <Input {...register("companyName")} aria-invalid={!!errors.companyName && (touchedFields.companyName || showStepErrors[1])} className="w-full" />
-              {errors.companyName && (touchedFields.companyName || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.companyName.message}</p>}
+              <Input {...register("legalName")} aria-invalid={!!errors.legalName && (touchedFields.legalName || showStepErrors[1])} className="w-full" />
+              {errors.legalName && (touchedFields.legalName || showStepErrors[1]) && <p className="text-sm text-red-600 mt-1">{errors.legalName.message}</p>}
             </div>
             <div>
               <Label className="text-sm">Cédula Jurídica</Label>
@@ -1538,13 +1836,259 @@ export default function InspectionForm() {
     </div>
   );
 
+  // Plataformas de Servicios Form
+  const ServicePlatformForm = () => (
+    <Card key="service-platform-card">
+      <CardHeader><CardTitle className="text-base">Plataformas de Servicios</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Número de trámite *</Label>
+          <Input 
+            placeholder="Ingrese el número de trámite" 
+            {...register("ps_procedureNumber")} 
+            aria-invalid={!!errors.ps_procedureNumber && (touchedFields.ps_procedureNumber || showStepErrors[4])} 
+          />
+          {errors.ps_procedureNumber && (touchedFields.ps_procedureNumber || showStepErrors[4]) && (
+            <p className="text-sm text-red-600 mt-1">{errors.ps_procedureNumber.message}</p>
+          )}
+        </div>
+        <div>
+          <Label>Observación</Label>
+          <Textarea 
+            rows={3} 
+            placeholder="Ingrese observaciones (opcional)"
+            {...register("ps_observation")} 
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Cobros (Collections) Form
+  const CollectionsForm = () => (
+    <Card key="collections-card">
+      <CardHeader><CardTitle className="text-base">Cobros</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div>
+          <Label>Firma del notificador *</Label>
+          <Input 
+            placeholder="URL de la firma o ruta del archivo" 
+            {...register("col_notifierSignatureUrl")}
+            aria-invalid={!!errors.col_notifierSignatureUrl && (touchedFields.col_notifierSignatureUrl || showStepErrors[4])}
+          />
+          {errors.col_notifierSignatureUrl && (touchedFields.col_notifierSignatureUrl || showStepErrors[4]) && (
+            <p className="text-sm text-red-600 mt-1">{errors.col_notifierSignatureUrl.message}</p>
+          )}
+          <p className="text-xs text-gray-500 mt-1">* Requerido si no selecciona un motivo de no firma</p>
+        </div>
+        
+        <div className="border-t pt-4">
+          <Label className="mb-3 block">Motivos de no firma (seleccione al menos uno si no hay firma)</Label>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="col_nobodyPresent"
+                {...register("col_nobodyPresent")}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="col_nobodyPresent" className="font-normal cursor-pointer">No había nadie</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="col_wrongAddress"
+                {...register("col_wrongAddress")}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="col_wrongAddress" className="font-normal cursor-pointer">Dirección incorrecta</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="col_movedAddress"
+                {...register("col_movedAddress")}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="col_movedAddress" className="font-normal cursor-pointer">Cambió domicilio</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="col_refusedToSign"
+                {...register("col_refusedToSign")}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="col_refusedToSign" className="font-normal cursor-pointer">No quiso firmar</Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="col_notLocated"
+                {...register("col_notLocated")}
+                className="w-4 h-4"
+              />
+              <Label htmlFor="col_notLocated" className="font-normal cursor-pointer">No se localiza</Label>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <Label>Otro motivo</Label>
+          <Input 
+            placeholder="Especifique otro motivo (opcional)" 
+            {...register("col_other")} 
+          />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
+  // Clausura de Obra (Work Closure) Form
+  const WorkClosureForm = () => (
+    <Card key="work-closure-card">
+      <CardHeader><CardTitle className="text-base">Clausura de Obra</CardTitle></CardHeader>
+      <CardContent className="space-y-4">
+        <div className="bg-blue-50 p-3 rounded-md mb-4">
+          <p className="text-sm text-blue-800">* Debe ingresar al menos <strong>número de finca</strong> o <strong>número de catastro</strong></p>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Número de finca *</Label>
+            <Input 
+              placeholder="Ej. 123456" 
+              {...register("wc_propertyNumber")}
+              aria-invalid={!!errors.wc_propertyNumber && (touchedFields.wc_propertyNumber || showStepErrors[4])}
+            />
+            {errors.wc_propertyNumber && (touchedFields.wc_propertyNumber || showStepErrors[4]) && (
+              <p className="text-sm text-red-600 mt-1">{errors.wc_propertyNumber.message}</p>
+            )}
+          </div>
+          <div>
+            <Label>Número de catastro *</Label>
+            <Input 
+              placeholder="Ej. CAT-789" 
+              {...register("wc_cadastralNumber")}
+              aria-invalid={!!errors.wc_cadastralNumber && (touchedFields.wc_cadastralNumber || showStepErrors[4])}
+            />
+          </div>
+          <div>
+            <Label>No. de contrato</Label>
+            <Input placeholder="Ej. CONT-2025-001" {...register("wc_contractNumber")} />
+          </div>
+          <div>
+            <Label>Número de permiso</Label>
+            <Input placeholder="Ej. PERM-456" {...register("wc_permitNumber")} />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <Label>Área tasada</Label>
+            <Input placeholder="Ej. 120 m²" {...register("wc_assessedArea")} />
+          </div>
+          <div>
+            <Label>Área construida</Label>
+            <Input placeholder="Ej. 100 m²" {...register("wc_builtArea")} />
+          </div>
+        </div>
+
+        <div>
+          <Label>Número de visita *</Label>
+          <select
+            {...register("wc_visitNumber")}
+            className="w-full px-3 py-2 border rounded-md"
+            aria-invalid={!!errors.wc_visitNumber && (touchedFields.wc_visitNumber || showStepErrors[4])}
+          >
+            <option value="">Seleccione...</option>
+            <option value="Visita 1">Visita 1</option>
+            <option value="Visita 2">Visita 2</option>
+            <option value="Visita 3">Visita 3</option>
+          </select>
+          {errors.wc_visitNumber && (touchedFields.wc_visitNumber || showStepErrors[4]) && (
+            <p className="text-sm text-red-600 mt-1">{errors.wc_visitNumber.message}</p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <input
+            type="checkbox"
+            id="wc_workReceipt"
+            {...register("wc_workReceipt")}
+            className="w-4 h-4"
+          />
+          <Label htmlFor="wc_workReceipt" className="font-normal cursor-pointer">Recibo de obra</Label>
+        </div>
+
+        <div>
+          <Label>Acciones *</Label>
+          <Textarea 
+            rows={3} 
+            placeholder="Describa las acciones tomadas (requerido)"
+            {...register("wc_actions")}
+            aria-invalid={!!errors.wc_actions && (touchedFields.wc_actions || showStepErrors[4])}
+          />
+          {errors.wc_actions && (touchedFields.wc_actions || showStepErrors[4]) && (
+            <p className="text-sm text-red-600 mt-1">{errors.wc_actions.message}</p>
+          )}
+        </div>
+
+        <div>
+          <Label>Observaciones</Label>
+          <Textarea 
+            rows={3} 
+            placeholder="Observaciones adicionales (opcional)"
+            {...register("wc_observations")} 
+          />
+        </div>
+
+        <div>
+          <Label>Fotografías de la clausura</Label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <PhotoField
+              key="wc1"
+              fieldKey="wc1"
+              label="Fotografía N.º 1"
+              photos={photos}
+              setPhotos={setPhotos}
+              photoErrors={photoErrors}
+              setPhotoErrors={setPhotoErrors}
+            />
+            <PhotoField
+              key="wc2"
+              fieldKey="wc2"
+              label="Fotografía N.º 2"
+              photos={photos}
+              setPhotos={setPhotos}
+              photoErrors={photoErrors}
+              setPhotoErrors={setPhotoErrors}
+            />
+            <PhotoField
+              key="wc3"
+              fieldKey="wc3"
+              label="Fotografía N.º 3"
+              photos={photos}
+              setPhotos={setPhotos}
+              photoErrors={photoErrors}
+              setPhotoErrors={setPhotoErrors}
+            />
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   const Step4 = () => (
     <div className="space-y-4 sm:space-y-6">
       <StepHeader icon={ClipboardList} title="Detalles específicos" subtitle="Según la dependencia seleccionada" step={4} />
       {dependency === Dependency.MayorOffice && <MayorOfficeForm key="mayor-office" />}
       {dependency === Dependency.Constructions && <ConstructionsForm key="constructions" />}
       {dependency === Dependency.MaritimeZone && <ZmtForm key="zmt" />}
-      {![Dependency.MayorOffice, Dependency.Constructions, Dependency.MaritimeZone].includes(dependency || "") && (
+      {dependency === Dependency.ServicePlatform && <ServicePlatformForm key="service-platform" />}
+      {dependency === Dependency.Collections && <CollectionsForm key="collections" />}
+      {dependency === Dependency.WorkClosure && <WorkClosureForm key="work-closure" />}
+      {![Dependency.MayorOffice, Dependency.Constructions, Dependency.MaritimeZone, Dependency.ServicePlatform, Dependency.Collections, Dependency.WorkClosure].includes(dependency || "") && (
         <div key="unsupported" className="text-center py-8 sm:py-10 text-slate-500">
           <Building className="w-10 h-10 sm:w-11 sm:h-11 mx-auto mb-3 text-slate-300" />
           <p className="text-sm sm:text-base">Seleccione una dependencia soportada para continuar</p>
@@ -1566,7 +2110,7 @@ export default function InspectionForm() {
         values.applicantType === ApplicantType.FISICA
           ? { applicantType: values.applicantType, individualRequest: { firstName: values.firstName, lastName1: values.lastName1, lastName2: values.lastName2 || null, physicalId: values.physicalId } }
           : values.applicantType === ApplicantType.JURIDICA
-          ? { applicantType: values.applicantType, legalEntityRequest: { companyName: values.companyName, legalId: values.legalId } }
+          ? { applicantType: values.applicantType, legalEntityRequest: { legalName: values.legalName, legalId: values.legalId } }
           : { applicantType: values.applicantType };
 
       const location = { district: values.district, exactAddress: values.exactAddress };
@@ -1593,6 +2137,14 @@ export default function InspectionForm() {
         }
       }
 
+      // 🐛 DEBUG: Estado actual de parcels antes de procesar
+      console.group('🔍 DEBUG: Parcels ANTES de crear zmtConcession');
+      console.log('📊 Parcels JSON:', JSON.stringify(parcels, null, 2));
+      console.log('� Parcels length:', parcels.length);
+      console.log('📋 Dependency value:', values.dependency);
+      console.log('📋 Is MaritimeZone?:', values.dependency === Dependency.MaritimeZone);
+      console.groupEnd();
+      
       const zmtConcession = values.dependency === Dependency.MaritimeZone ? {
         fileNumber: values.zc_fileNumber,
         concessionType: values.zc_concessionType,
@@ -1600,27 +2152,100 @@ export default function InspectionForm() {
         expiresAt: values.zc_expiresAt || null,
         observations: values.zc_observations || null,
         photos: [],
-        parcels: parcels.map(parcel => ({
-          planType: parcel.planType,
-          planNumber: parcel.planNumber,
-          area: parcel.area ? String(parcel.area) : "0",
-          mojonType: parcel.mojonType,
-          planComplies: parcel.planComplies,
-          respectsBoundary: parcel.respectsBoundary,
-          anchorageMojones: parcel.anchorageMojones,
-          topography: parcel.topography,
-          topographyOther: parcel.topographyOther || "",
-          fenceTypes: parcel.fenceTypes,
-          fencesInvadePublic: parcel.fencesInvadePublic,
-          roadHasPublicAccess: parcel.roadHasPublicAccess,
-          roadDescription: parcel.roadDescription || "",
-          roadLimitations: parcel.roadLimitations || "",
-          roadMatchesPlan: parcel.roadMatchesPlan,
-          rightOfWayWidth: parcel.rightOfWayWidth || "",
-        })),
+        parcels: parcels.map((parcel, idx) => {
+          console.log(`🗺️ Processing parcel ${idx + 1}:`, parcel);
+          return {
+            planType: parcel.planType,
+            planNumber: parcel.planNumber,
+            area: parcel.area,
+            mojonType: parcel.mojonType,
+            planComplies: parcel.planComplies,
+            respectsBoundary: parcel.respectsBoundary,
+            anchorageMojones: parcel.anchorageMojones,
+            topography: parcel.topography,
+            topographyOther: parcel.topographyOther || null,
+            fenceTypes: parcel.fenceTypes,
+            fencesInvadePublic: parcel.fencesInvadePublic,
+            roadHasPublicAccess: parcel.roadHasPublicAccess,
+            roadDescription: parcel.roadDescription || null,
+            roadLimitations: parcel.roadLimitations || null,
+            roadMatchesPlan: parcel.roadMatchesPlan,
+            rightOfWayWidth: parcel.rightOfWayWidth || null,
+          };
+        }),
       } : undefined;
+      
+      // 🐛 DEBUG: ZMT Concession completo con formato JSON
+      if (zmtConcession) {
+        console.group('🏝️ DEBUG: ZMT Concession CREADO');
+        console.log('📊 ZMT Concession JSON (COMPLETO):', JSON.stringify(zmtConcession, null, 2));
+        console.log('� Concession Info:', {
+          fileNumber: zmtConcession.fileNumber,
+          concessionType: zmtConcession.concessionType,
+          grantedAt: zmtConcession.grantedAt,
+          expiresAt: zmtConcession.expiresAt,
+          observations: zmtConcession.observations,
+          totalParcels: zmtConcession.parcels.length
+        });
+        
+        console.log('\n📦 Parcels Array (Formato que se enviará al backend):');
+        console.log(JSON.stringify(zmtConcession.parcels, null, 2));
+        
+        zmtConcession.parcels.forEach((p, i) => {
+          console.group(`\n📍 Parcel ${i + 1} Detalle:`);
+          console.log('JSON:', JSON.stringify(p, null, 2));
+          console.log('Validación:', {
+            planType: p.planType ? '✅' : '❌ FALTA',
+            planNumber: p.planNumber ? '✅' : '❌ FALTA',
+            area: p.area ? '✅' : '❌ FALTA',
+            mojonType: p.mojonType ? '✅' : '❌ FALTA',
+            topography: p.topography ? '✅' : '❌ FALTA',
+            hasAllRequired: !!(p.planType && p.planNumber && p.area && p.mojonType && p.topography)
+          });
+          console.groupEnd();
+        });
+        console.groupEnd();
+      } else {
+        console.group('⚠️ DEBUG: ZMT Concession NO CREADO');
+        console.log('Dependency actual:', values.dependency);
+        console.log('Dependency.MaritimeZone:', Dependency.MaritimeZone);
+        console.log('¿Son iguales?:', values.dependency === Dependency.MaritimeZone);
+        console.groupEnd();
+      }
 
       // Parse and normalize userIds
+      // Plataformas de Servicios
+      const servicePlatform = values.dependency === Dependency.ServicePlatform ? {
+        procedureNumber: values.ps_procedureNumber,
+        observation: values.ps_observation || null,
+      } : undefined;
+
+      // Cobros (Collections)
+      const collection = values.dependency === Dependency.Collections ? {
+        notifierSignatureUrl: values.col_notifierSignatureUrl || null,
+        nobodyPresent: values.col_nobodyPresent ? 'X' : null,
+        wrongAddress: values.col_wrongAddress ? 'X' : null,
+        movedAddress: values.col_movedAddress ? 'X' : null,
+        refusedToSign: values.col_refusedToSign ? 'X' : null,
+        notLocated: values.col_notLocated ? 'X' : null,
+        other: values.col_other || null,
+      } : undefined;
+
+      // Clausura de Obra (Work Closure)
+      const workClosure = values.dependency === Dependency.WorkClosure ? {
+        propertyNumber: values.wc_propertyNumber || null,
+        cadastralNumber: values.wc_cadastralNumber || null,
+        contractNumber: values.wc_contractNumber || null,
+        permitNumber: values.wc_permitNumber || null,
+        assessedArea: values.wc_assessedArea || null,
+        builtArea: values.wc_builtArea || null,
+        visitNumber: values.wc_visitNumber || null,
+        workReceipt: !!values.wc_workReceipt,
+        actions: values.wc_actions || null,
+        observations: values.wc_observations || null,
+        photoUrls: [],
+      } : undefined;
+
       const parsedUserIds = (() => {
         try {
           return JSON.parse(values.userIds || "[]");
@@ -1644,8 +2269,35 @@ export default function InspectionForm() {
         mayorOffice,
         constructions,
         zmtConcession,
+        servicePlatform,
+        collection,
+        workClosure,
       };
 
+      console.log('� Payload to send:', payload);
+      console.log('📋 Dependency value:', values.dependency);
+      console.log('�📷 Current photos state:', photos);
+      
+      // 🐛 DEBUG: Payload FINAL JSON detallado
+      console.group('========== DEBUG: PAYLOAD FINAL COMPLETO ==========');
+      console.log('PAYLOAD JSON:');
+      console.log(JSON.stringify(payload, null, 2));
+      
+      if (payload.zmtConcession) {
+        console.group('ZMT CONCESSION EN PAYLOAD:');
+        console.log('ZMT JSON:', JSON.stringify(payload.zmtConcession, null, 2));
+        console.log('Parcels count:', payload.zmtConcession.parcels?.length || 0);
+        
+        if (payload.zmtConcession.parcels && payload.zmtConcession.parcels.length > 0) {
+          console.log('PARCELS ARRAY (Formato Backend):');
+          console.log(JSON.stringify(payload.zmtConcession.parcels, null, 2));
+        }
+        console.groupEnd();
+      } else {
+        console.warn('zmtConcession NO esta en payload');
+      }
+      console.groupEnd();
+      
       const photosBySection = {
         antiguedadPhotos: [photos.antiguedad1, photos.antiguedad2, photos.antiguedad3].filter(Boolean),
         pcCancellationPhotos: [photos.pc1].filter(Boolean),
@@ -1653,7 +2305,17 @@ export default function InspectionForm() {
         workReceiptPhotos: [photos.ro1].filter(Boolean),
         mayorOfficePhotos: [photos.mo1, photos.mo2, photos.mo3].filter(Boolean),
         zmtConcessionPhotos: [photos.zmt1, photos.zmt2, photos.zmt3].filter(Boolean),
+        workClosurePhotos: [photos.wc1, photos.wc2, photos.wc3].filter(Boolean),
       };
+
+      console.log('📸 Photos organized by section:', {
+        antiguedadPhotos: photosBySection.antiguedadPhotos.length,
+        pcCancellationPhotos: photosBySection.pcCancellationPhotos.length,
+        generalInspectionPhotos: photosBySection.generalInspectionPhotos.length,
+        workReceiptPhotos: photosBySection.workReceiptPhotos.length,
+        mayorOfficePhotos: photosBySection.mayorOfficePhotos.length,
+        zmtConcessionPhotos: photosBySection.zmtConcessionPhotos.length,
+      });
 
       const created = await createInspectionFromForm(payload, photosBySection);
       // Reset form
@@ -1663,7 +2325,7 @@ export default function InspectionForm() {
         applicantType: ApplicantType.ANONIMO,
         userIds: "[]",
         firstName: "", lastName1: "", lastName2: "", physicalId: "",
-        companyName: "", legalId: "",
+        legalName: "", legalId: "",
         district: District.SantaCruz,
         exactAddress: "",
         dependency: undefined,

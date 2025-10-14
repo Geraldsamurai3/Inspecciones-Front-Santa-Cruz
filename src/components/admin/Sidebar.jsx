@@ -44,7 +44,7 @@ export default function Sidebar() {
 
   const allItems = [
     { to: '/admin/inspector-dashboard', label: 'Dashboard Inspector', icon: <FileText size={20}/>, roles: ['inspector'] },
-        { to: '/admin/admin-dashboard', label: 'Dashboard Admin', icon: <BarChart3 size={20}/>, roles: ['admin'] },
+    { to: '/admin/admin-dashboard', label: 'Dashboard Admin', icon: <BarChart3 size={20}/>, roles: ['admin'] },
     { 
       to: null, 
       label: 'Inspecciones-Trámite', 
@@ -62,26 +62,23 @@ export default function Sidebar() {
     { to: '/admin/settings', label: 'Ajustes', icon: <Settings size={20}/>, roles: ['admin'] },
   ]
   const menuItems = allItems.filter(item => {
-    if (role === 'admin') return true
-    if (role === 'inspector') {
-      if (item.isDropdown) {
-        // Para dropdowns, filtramos los subelementos
-        const filteredSubItems = item.subItems?.filter(subItem => 
-          subItem.roles?.includes('inspector')
-        )
-        return filteredSubItems && filteredSubItems.length > 0
-      }
-      return item.roles?.includes('inspector')
+    // Verificar si el rol del usuario está en los roles permitidos del item
+    if (item.isDropdown) {
+      // Para dropdowns, verificar si hay subelementos accesibles
+      const filteredSubItems = item.subItems?.filter(subItem => 
+        subItem.roles?.includes(role)
+      )
+      return filteredSubItems && filteredSubItems.length > 0
     }
-    // por defecto, mostrar solo lo mínimo para inspectores
-    return item.roles?.includes('inspector')
+    // Para items normales, verificar si el rol está permitido
+    return item.roles?.includes(role)
   }).map(item => {
-    if (item.isDropdown && role !== 'admin') {
-      // Para inspectores, filtrar subelementos
+    if (item.isDropdown) {
+      // Filtrar subelementos según el rol
       return {
         ...item,
         subItems: item.subItems?.filter(subItem => 
-          subItem.roles?.includes('inspector')
+          subItem.roles?.includes(role)
         )
       }
     }

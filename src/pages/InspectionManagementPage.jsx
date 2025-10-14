@@ -433,7 +433,7 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
             <div>
               <label className="text-sm font-medium text-gray-500">Datos del Solicitante (Persona Jurídica)</label>
               <div className="bg-blue-50 p-4 rounded-lg space-y-2">
-                <p><span className="font-medium">Nombre de la Empresa:</span> {inspection.legalEntityRequest.companyName}</p>
+                <p><span className="font-medium">Razón Social:</span> {inspection.legalEntityRequest.legalName}</p>
                 <p><span className="font-medium">Cédula Jurídica:</span> {inspection.legalEntityRequest.legalId}</p>
               </div>
             </div>
@@ -597,15 +597,48 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
                 {inspection.concession.parcels && inspection.concession.parcels.length > 0 && (
                   <div>
                     <span className="font-medium">Parcelas ({inspection.concession.parcels.length}):</span>
-                    <div className="mt-2 space-y-2">
+                    <div className="mt-2 space-y-4">
                       {inspection.concession.parcels.map((parcel, index) => (
-                        <div key={index} className="bg-white p-3 rounded border">
-                          <p className="font-medium text-sm">Parcela #{index + 1}</p>
-                          <div className="grid grid-cols-2 gap-2 text-sm mt-2">
-                            {parcel.planType && <p><span className="font-medium">Tipo de Plano:</span> {parcel.planType}</p>}
-                            {parcel.planNumber && <p><span className="font-medium">Número de Plano:</span> {parcel.planNumber}</p>}
-                            {parcel.area && <p><span className="font-medium">Área:</span> {parcel.area} m²</p>}
-                            {parcel.mojonType && <p><span className="font-medium">Tipo de Mojón:</span> {parcel.mojonType}</p>}
+                        <div key={index} className="bg-white p-4 rounded border">
+                          <p className="font-medium text-sm mb-3 text-cyan-700">Parcela #{index + 1}</p>
+                          
+                          {/* Sección 1: Datos del Plano */}
+                          <div className="mb-3">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Datos del Plano y Mojones</p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              {parcel.planType && <p><span className="font-medium">Tipo de Plano:</span> {parcel.planType}</p>}
+                              {parcel.planNumber && <p><span className="font-medium">Número de Plano:</span> {parcel.planNumber}</p>}
+                              {parcel.area && <p><span className="font-medium">Área:</span> {parcel.area} m²</p>}
+                              {parcel.mojonType && <p><span className="font-medium">Tipo de Mojón:</span> {parcel.mojonType}</p>}
+                              <p><span className="font-medium">¿Plano cumple?</span> {parcel.planComplies ? 'Sí' : 'No'}</p>
+                              <p><span className="font-medium">¿Respeta linderos?</span> {parcel.respectsBoundary ? 'Sí' : 'No'}</p>
+                              {parcel.anchorageMojones && <p className="col-span-2"><span className="font-medium">Anclaje de mojones:</span> {parcel.anchorageMojones}</p>}
+                            </div>
+                          </div>
+
+                          {/* Sección 2: Topografía y Cercas */}
+                          <div className="mb-3">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Topografía y Cercas</p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              {parcel.topography && <p><span className="font-medium">Topografía:</span> {parcel.topography}</p>}
+                              {parcel.topographyOther && <p><span className="font-medium">Otra topografía:</span> {parcel.topographyOther}</p>}
+                              {parcel.fenceTypes && parcel.fenceTypes.length > 0 && (
+                                <p className="col-span-2"><span className="font-medium">Tipos de cerca:</span> {parcel.fenceTypes.join(', ')}</p>
+                              )}
+                              <p><span className="font-medium">¿Cercas invaden?</span> {parcel.fencesInvadePublic ? 'Sí' : 'No'}</p>
+                            </div>
+                          </div>
+
+                          {/* Sección 3: Acceso Vial */}
+                          <div>
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Acceso Vial</p>
+                            <div className="grid grid-cols-2 gap-2 text-sm">
+                              <p><span className="font-medium">¿Acceso público?</span> {parcel.roadHasPublicAccess ? 'Sí' : 'No'}</p>
+                              <p><span className="font-medium">¿Coincide con plano?</span> {parcel.roadMatchesPlan ? 'Sí' : 'No'}</p>
+                              {parcel.roadDescription && <p className="col-span-2"><span className="font-medium">Descripción de vía:</span> {parcel.roadDescription}</p>}
+                              {parcel.roadLimitations && <p className="col-span-2"><span className="font-medium">Limitaciones de vía:</span> {parcel.roadLimitations}</p>}
+                              {parcel.rightOfWayWidth && <p><span className="font-medium">Ancho de servidumbre:</span> {parcel.rightOfWayWidth}</p>}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -722,13 +755,21 @@ export default function InspectionManagementPage() {
   const filteredInspections = useMemo(() => {
     console.log('=== DEPENDENCY FILTER DEBUG ===');
     console.log('dependencyFilter selected:', dependencyFilter);
-    console.log('Total inspections:', inspections.length);
+    console.log('📊 Total inspections:', inspections.length);
     
     if (inspections.length > 0) {
-      console.log('Sample inspection dependencies:');
+      console.log('🔍 Sample inspection dependencies:');
       inspections.slice(0, 3).forEach((insp, i) => {
-        console.log(`  ${i+1}. dependency: "${insp.dependency}"`);
+        console.log(`  ${i+1}. dependency:`, {
+          raw: insp.dependency,
+          type: typeof insp.dependency,
+          isUndefined: insp.dependency === undefined,
+          isNull: insp.dependency === null,
+          isEmpty: insp.dependency === '',
+          stringified: JSON.stringify(insp.dependency)
+        });
       });
+      console.log('📋 Full first inspection:', inspections[0]);
     }
     
     return inspections.filter(inspection => {

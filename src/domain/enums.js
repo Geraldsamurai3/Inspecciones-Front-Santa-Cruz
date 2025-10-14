@@ -31,6 +31,7 @@ export const Dependency = Object.freeze({
   TaxesAndLicenses: "TaxesAndLicenses",
   ServicePlatform: "ServicePlatform",
   MaritimeZone: "MaritimeZone",
+  WorkClosure: "WorkClosure",
 });
 
 export const ConstructionProcedure = Object.freeze({
@@ -39,4 +40,10 @@ export const ConstructionProcedure = Object.freeze({
   AnulacionPC: "AnulacionPC",
   InspeccionGeneral: "InspeccionGeneral",
   RecibidoObra: "RecibidoObra",
+});
+
+export const VisitNumber = Object.freeze({
+  Visit1: "Visita 1",
+  Visit2: "Visita 2",
+  Visit3: "Visita 3",
 });
