@@ -19,6 +19,7 @@ import {
   Plus,
   List,
   BarChart3,
+  Trash2,
 } from 'lucide-react'
 
 export default function Sidebar() {
@@ -39,7 +40,7 @@ export default function Sidebar() {
 
   const handleLogout = () => {
     logout()
-    navigate('/admin/login', { replace: true })
+    navigate('/login', { replace: true })
   }
 
   const allItems = [
@@ -54,10 +55,11 @@ export default function Sidebar() {
       subItems: [
         { to: '/admin/inspectionsform', label: 'Nuevo Trámite', icon: <Plus size={18}/>, roles: ['admin','inspector'] },
         { to: '/admin/inspections-management', label: 'Gestión de Trámites', icon: <List size={18}/>, roles: ['admin'] },
-        
+        { to: '/admin/trash', label: 'Papelera', icon: <Trash2 size={18}/>, roles: ['admin'] },
       ]
     },
     { to: '/admin/stats', label: 'Estadísticas', icon: <BarChart3 size={20}/>, roles: ['admin'] },
+    { to: '/admin/reports', label: 'Reportes', icon: <FileText size={20}/>, roles: ['admin'] },
     { to: '/admin/users', label: 'Usuarios', icon: <Users size={20}/>, roles: ['admin'] },
     { to: '/admin/settings', label: 'Ajustes', icon: <Settings size={20}/>, roles: ['admin'] },
   ]

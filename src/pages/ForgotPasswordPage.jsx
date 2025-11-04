@@ -14,13 +14,24 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setLoading(true)
     try {
+      // Asegurar que no hay token previo que pueda causar confusión
+      localStorage.removeItem('token')
+      
       await forgotPassword(email)
+      
+      // Verificar que no se haya guardado un token de acceso por error
+      const suspiciousToken = localStorage.getItem('token')
+      if (suspiciousToken) {
+        console.error('SEGURIDAD: Token detectado después de forgot-password, removiendo...')
+        localStorage.removeItem('token')
+      }
+      
       await Swal.fire({
         icon: 'success',
         title: '¡Correo enviado!',
         text: 'Revisa tu bandeja para restablecer tu contraseña.',
       })
-      navigate('/admin/login', { replace: true })
+      navigate('/login', { replace: true })
     } catch (err) {
       Swal.fire({ icon:'error', title:'Error', text: err.message })
     } finally {
@@ -66,7 +77,7 @@ export default function ForgotPasswordPage() {
 
           <button
             type="button"
-            onClick={() => navigate('/admin/login')}
+            onClick={() => navigate('/login')}
             className="w-full py-3 mt-4 text-blue-600 font-medium rounded-lg border border-blue-600 hover:bg-blue-50 transition"
           >
             Volver al login

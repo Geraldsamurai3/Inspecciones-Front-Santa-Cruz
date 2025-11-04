@@ -1,4 +1,6 @@
 // src/services/statsService.js
+import { handleTokenExpired } from '../utils/auth-helpers';
+
 const API_BASE_URL = import.meta.env.VITE_API_URL;
 
 class StatsService {
@@ -20,6 +22,12 @@ class StatsService {
       });
 
       if (!response.ok) {
+        // Manejar token expirado
+        if (response.status === 401) {
+          handleTokenExpired();
+          throw new Error('Token expirado');
+        }
+        
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 

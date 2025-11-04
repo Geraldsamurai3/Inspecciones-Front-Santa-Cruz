@@ -89,6 +89,10 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
       console.log(`📸 Uploading ${photosBySection.zmtConcessionPhotos.length} ZMT Concession photos`);
       uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.zmtConcessionPhotos, { section: 'zmtConcessionPhotos' }));
     }
+    if (photosBySection.workClosurePhotos?.length) {
+      console.log(`📸 Uploading ${photosBySection.workClosurePhotos.length} Work Closure photos`);
+      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.workClosurePhotos, { section: 'workClosurePhotos' }));
+    }
     
     console.log(`📤 Total upload requests: ${uploads.length}`);
     const results = await Promise.allSettled(uploads);
@@ -123,6 +127,42 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
     await fetchInspections(initialParamsRef.current);
   }, [fetchInspections]);
 
+  // Papelera functions
+  const getTrashInspections = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await inspectionsService.getTrashInspections();
+      const inspectionsData = Array.isArray(data) ? data : [];
+      
+      // Ordenar por fecha de eliminación (más reciente primero)
+      const sortedInspections = inspectionsData.sort((a, b) => {
+        const dateA = new Date(a.deletedAt || 0);
+        const dateB = new Date(b.deletedAt || 0);
+        return dateB - dateA;
+      });
+      
+      return sortedInspections;
+    } catch (err) {
+      setError(err);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const moveToTrash = useCallback(async (id) => {
+    const result = await inspectionsService.moveToTrash(id);
+    await fetchInspections(initialParamsRef.current);
+    return result;
+  }, [fetchInspections]);
+
+  const restoreFromTrash = useCallback(async (id) => {
+    const result = await inspectionsService.restoreFromTrash(id);
+    await fetchInspections(initialParamsRef.current);
+    return result;
+  }, [fetchInspections]);
+
   return {
     inspections,
     pagination,
@@ -134,5 +174,9 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
     updateInspection,
     updateInspectionStatus,
     deleteInspection,
+    // Papelera
+    getTrashInspections,
+    moveToTrash,
+    restoreFromTrash,
   };
 }

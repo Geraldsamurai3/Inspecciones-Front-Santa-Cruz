@@ -1,4 +1,6 @@
 // src/services/authService.js
+import { handleTokenExpired, isValidToken } from '../utils/auth-helpers';
+
 const BASE_URL = import.meta.env.VITE_API_URL
 
 // Sanitizar datos de entrada para prevenir XSS
@@ -7,13 +9,6 @@ const sanitizeInput = (input) => {
     return input.trim().replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
   }
   return input;
-};
-
-// Validar token JWT básico
-const isValidToken = (token) => {
-  if (!token || typeof token !== 'string') return false;
-  const parts = token.split('.');
-  return parts.length === 3 && parts.every(part => part.length > 0);
 };
 
 async function request(path, opts = {}) {
@@ -56,10 +51,11 @@ async function request(path, opts = {}) {
   if (!res.ok) {
     const err = await res.json().catch(() => ({}))
     
-    // Logout en caso de token inválido
-    if (res.status === 401 && token) {
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    // Solo manejar token expirado si NO es una petición de login
+    // En el login, 401 significa credenciales inválidas
+    if (res.status === 401 && !path.includes('/auth/login')) {
+      handleTokenExpired();
+      throw new Error('Token expirado');
     }
     
     throw new Error(err.message || `Error ${res.status}`)

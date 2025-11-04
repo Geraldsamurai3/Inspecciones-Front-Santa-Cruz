@@ -9,6 +9,7 @@ export const InspectionStatus = Object.freeze({
   EN_PROCESO: "En proceso",
   REVISADO: "Revisado",
   ARCHIVADO: "Archivado",
+  PAPELERA: "Papelera",
 });
 
 export const District = Object.freeze({

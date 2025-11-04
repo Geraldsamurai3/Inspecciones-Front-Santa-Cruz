@@ -1,4 +1,6 @@
 // src/services/inspectionsService.js
+import { handleTokenExpired } from '../utils/auth-helpers';
+
 const BASE_URL = import.meta.env.VITE_API_URL;
 
 async function request(path, opts = {}) {
@@ -22,6 +24,12 @@ async function request(path, opts = {}) {
   });
 
   if (!res.ok) {
+    // Manejar token expirado
+    if (res.status === 401) {
+      handleTokenExpired();
+      throw new Error('Token expirado');
+    }
+    
     let errBody = {};
     try { errBody = await res.json(); } catch {}
     throw new Error(errBody.message || `Error ${res.status}`);
@@ -49,6 +57,11 @@ export const inspectionsService = {
     });
   },
   deleteInspection: (id) => request(`/inspections/${id}`, { method: 'DELETE' }),
+
+  // Papelera endpoints
+  getTrashInspections: () => request('/inspections/trash/list'),
+  moveToTrash: (id) => request(`/inspections/${id}/trash`, { method: 'PATCH' }),
+  restoreFromTrash: (id) => request(`/inspections/${id}/restore`, { method: 'PATCH' }),
 
   uploadPhotos: async (inspectionId, files = [], { section = 'general' } = {}) => {
     if (!files || files.length === 0) return null;

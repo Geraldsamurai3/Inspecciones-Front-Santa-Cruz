@@ -25,6 +25,8 @@ import StatusChart from '../components/stats/StatusChart';
 import InspectionTrends from '../components/stats/InspectionTrends';
 import InspectorRanking from '../components/stats/InspectorRanking';
 import DepartmentComparison from '../components/stats/DepartmentComparison';
+import DependenciesFlat from '../components/stats/DependenciesFlat';
+import DependenciesNested from '../components/stats/DependenciesNested';
 import DetailedAnalytics from '../components/stats/DetailedAnalytics';
 import StatsConnectionTest from '../components/stats/StatsConnectionTest';
 import StatsErrorBoundary from '../components/stats/StatsErrorBoundary';
@@ -65,6 +67,18 @@ export default function StatsPage() {
       label: 'Inspectores',
       icon: <Users size={18} />,
       description: 'Ranking y productividad por inspector'
+    },
+    {
+      id: 'dependencies-flat',
+      label: 'Dependencias Detalladas',
+      icon: <Building2 size={18} />,
+      description: 'Subdependencias como ítems independientes'
+    },
+    {
+      id: 'dependencies-nested',
+      label: 'Dependencias Jerárquicas',
+      icon: <Building2 size={18} />,
+      description: 'Vista expandible con subdependencias'
     },
     {
       id: 'departments',
@@ -118,6 +132,18 @@ export default function StatsPage() {
         return (
           <StatsErrorBoundary>
             <InspectorRanking dateRange={dateRange} />
+          </StatsErrorBoundary>
+        );
+      case 'dependencies-flat':
+        return (
+          <StatsErrorBoundary>
+            <DependenciesFlat />
+          </StatsErrorBoundary>
+        );
+      case 'dependencies-nested':
+        return (
+          <StatsErrorBoundary>
+            <DependenciesNested />
           </StatsErrorBoundary>
         );
       case 'departments':
@@ -200,7 +226,7 @@ export default function StatsPage() {
       {/* Navigation Tabs */}
       <Card>
         <CardContent className="p-4">
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
             {views.map((view) => (
               <button
                 key={view.id}

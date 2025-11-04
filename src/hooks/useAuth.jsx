@@ -1,6 +1,7 @@
 // src/hooks/useAuth.jsx
 import { createContext, useContext, useState, useCallback } from 'react'
 import { authService } from '../services/authService'
+import { handleManualLogout } from '../utils/auth-helpers'
 
 // Decodifica JWT sin librerías
 function decodeJWT(token) {
@@ -57,7 +58,7 @@ export function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem('token')
+    handleManualLogout() // Usa la función que marca como logout manual
     setUser(null)
   }, [])
 

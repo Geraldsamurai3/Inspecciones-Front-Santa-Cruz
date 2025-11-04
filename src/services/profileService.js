@@ -1,4 +1,6 @@
 // src/services/profileService.js
+import { handleTokenExpired } from '../utils/auth-helpers';
+
 const BASE_URL = import.meta.env.VITE_API_URL
 
 async function request(path, opts = {}) {
@@ -13,6 +15,12 @@ async function request(path, opts = {}) {
     body: body ? JSON.stringify(body) : undefined,
   })
   if (!res.ok) {
+    // Manejar token expirado
+    if (res.status === 401) {
+      handleTokenExpired();
+      throw new Error('Token expirado');
+    }
+    
     const err = await res.json().catch(()=>({}))
     throw new Error(err.message||`Error ${res.status}`)
   }

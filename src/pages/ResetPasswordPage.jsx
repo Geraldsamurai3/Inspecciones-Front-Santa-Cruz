@@ -20,7 +20,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     if (!token) {
       Swal.fire({ icon: 'error', title: 'Token inválido' });
-      navigate('/admin/login', { replace: true });
+      navigate('/login', { replace: true });
     }
   }, [token, navigate]);
 
@@ -42,13 +42,24 @@ export default function ResetPasswordPage() {
     if (!validate()) return;
     setLoading(true);
     try {
+      // Asegurar que no hay token de sesión previo
+      localStorage.removeItem('token');
+      
       await resetPassword(token, password);
+      
+      // CRÍTICO: Verificar que no se haya guardado un access_token por error
+      const suspiciousToken = localStorage.getItem('token');
+      if (suspiciousToken) {
+        console.error('SEGURIDAD: Token de acceso detectado después de reset-password, removiendo...');
+        localStorage.removeItem('token');
+      }
+      
       await Swal.fire({
         icon: 'success',
         title: 'Contraseña restablecida',
-        text: 'Ya puedes iniciar sesión.',
+        text: 'Ya puedes iniciar sesión con tu nueva contraseña.',
       });
-      navigate('/admin/login', { replace: true });
+      navigate('/login', { replace: true });
     } catch (err) {
       Swal.fire({
         icon: 'error',
@@ -136,7 +147,7 @@ export default function ResetPasswordPage() {
 
           <button
             type="button"
-            onClick={() => navigate('/admin/login')}
+            onClick={() => navigate('/login')}
             className="w-full py-3 mt-4 text-blue-600 font-medium rounded-lg border border-blue-600 hover:bg-blue-50 transition"
             disabled={loading}
           >

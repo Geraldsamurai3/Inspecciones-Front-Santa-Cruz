@@ -117,7 +117,7 @@ export function mapInspectionDto(values = {}) {
       dto.pcCancellation = {
         contractNumber: nullIfEmpty(data.contractNumber),
         pcNumber: nullIfEmpty(data.pcNumber),
-        built: data.built,
+        wasBuilt: data.built, // Backend espera 'wasBuilt' no 'built'
         observations: nullIfEmpty(data.observations),
       };
     }

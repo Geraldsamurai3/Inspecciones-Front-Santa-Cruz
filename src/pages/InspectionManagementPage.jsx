@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import Swal from 'sweetalert2';
 import { 
   Search, 
   MapPin, 
@@ -19,6 +20,7 @@ import {
   Hash,
   Image,
   ZoomIn,
+  Trash2,
   TrendingUp,
   AlertTriangle,
   Users,
@@ -92,22 +94,27 @@ const statusConfig = {
   [InspectionStatus.NUEVO]: { 
     color: 'bg-blue-100 text-blue-800 border-blue-200', 
     label: 'Nuevo',
-    actions: ['view', 'start']
+    actions: ['view', 'start', 'trash']
   },
   [InspectionStatus.EN_PROCESO]: { 
     color: 'bg-yellow-100 text-yellow-800 border-yellow-200', 
     label: 'En Proceso',
-    actions: ['view', 'complete']
+    actions: ['view', 'complete', 'trash']
   },
   [InspectionStatus.REVISADO]: { 
     color: 'bg-green-100 text-green-800 border-green-200', 
     label: 'Revisado',
-    actions: ['view', 'archive']
+    actions: ['view', 'archive', 'trash']
   },
   [InspectionStatus.ARCHIVADO]: { 
     color: 'bg-gray-100 text-gray-800 border-gray-200', 
     label: 'Archivado',
-    actions: ['view']
+    actions: ['view', 'trash']
+  },
+  [InspectionStatus.PAPELERA]: { 
+    color: 'bg-red-100 text-red-800 border-red-200', 
+    label: 'Papelera',
+    actions: ['view', 'restore']
   }
 };
 
@@ -258,7 +265,7 @@ const PhotoGallery = ({ photos, title }) => {
 };
 
 // Componente del modal de detalles
-const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) => {
+const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange, onMoveToTrash }) => {
   if (!isOpen || !inspection) return null;
 
   const formatDate = (dateStr) => {
@@ -707,6 +714,12 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
               Archivar
             </Button>
           )}
+          {getStatusConfig(inspection.status).actions?.includes('trash') && (
+            <Button variant="destructive" onClick={() => onMoveToTrash(inspection.id)}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Mover a Papelera
+            </Button>
+          )}
         </div>
       </div>
     </div>
@@ -715,7 +728,7 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange }) 
 
 // Componente principal
 export default function InspectionManagementPage() {
-  const { inspections, loading, error, fetchInspections, updateInspectionStatus } = useInspections({ 
+  const { inspections, loading, error, fetchInspections, updateInspectionStatus, moveToTrash } = useInspections({ 
     autoFetch: true,
     initialParams: {}
   });
@@ -853,10 +866,31 @@ export default function InspectionManagementPage() {
     
     try {
       await updateInspectionStatus(inspectionId, newStatus);
+      
+      // Cerrar el modal después de actualizar el estado
+      setIsModalOpen(false);
+      setSelectedInspection(null);
+      
+      // Mostrar mensaje de éxito
+      Swal.fire({
+        icon: 'success',
+        title: '¡Actualizado!',
+        text: `Estado cambiado a "${newStatus}" correctamente.`,
+        timer: 2000,
+        showConfirmButton: false
+      });
+      
       // El estado se actualizará automáticamente por el hook useInspections
     } catch (error) {
       console.error('Error updating inspection status:', error);
-      // Aquí podrías mostrar una notificación de error
+      
+      // Mostrar mensaje de error
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.response?.data?.message || 'No se pudo actualizar el estado de la inspección.',
+        confirmButtonColor: '#dc2626'
+      });
     } finally {
       // Remover el estado de loading
       setLoadingStates(prev => {
@@ -864,6 +898,49 @@ export default function InspectionManagementPage() {
         delete newStates[inspectionId];
         return newStates;
       });
+    }
+  };
+
+  const handleMoveToTrash = async (inspectionId) => {
+    const result = await Swal.fire({
+      title: '¿Estás seguro?',
+      text: '¿Deseas mover esta inspección a la papelera?',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Sí, mover a papelera',
+      cancelButtonText: 'Cancelar'
+    });
+
+    if (result.isConfirmed) {
+      setLoadingStates(prev => ({ ...prev, [inspectionId]: true }));
+      
+      try {
+        await moveToTrash(inspectionId);
+        setIsModalOpen(false);
+        setSelectedInspection(null);
+        Swal.fire({
+          title: '¡Movido!',
+          text: 'La inspección ha sido movida a la papelera correctamente.',
+          icon: 'success',
+          confirmButtonColor: '#16a34a'
+        });
+      } catch (error) {
+        console.error('Error moving to trash:', error);
+        Swal.fire({
+          title: 'Error',
+          text: error.response?.data?.message || 'No se pudo mover la inspección a la papelera.',
+          icon: 'error',
+          confirmButtonColor: '#dc2626'
+        });
+      } finally {
+        setLoadingStates(prev => {
+          const newStates = { ...prev };
+          delete newStates[inspectionId];
+          return newStates;
+        });
+      }
     }
   };
 
@@ -1376,6 +1453,7 @@ export default function InspectionManagementPage() {
           setSelectedInspection(null);
         }}
         onStatusChange={handleStatusChange}
+        onMoveToTrash={handleMoveToTrash}
       />
         </div>
       </div>

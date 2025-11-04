@@ -14,11 +14,16 @@ import ResetPasswordPage from './pages/ResetPasswordPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import InspectionForm from './components/inspections/InspectionForm'
 import StatsPage from './pages/StatsPage.jsx'
+import TrashPage from './pages/TrashPage.jsx'
+import ReportsPage from './pages/ReportsPage.jsx'
+import TokenExpirationChecker from './components/TokenExpirationChecker'
 
 
 export default function App() {
   return (
-    <Routes>
+    <>
+      <TokenExpirationChecker />
+      <Routes>
       {/* 1) Ruta pública de login */}
       <Route path="/login" element={<LoginPage />} />
       <Route path="/admin/forgot-password" element={<ForgotPasswordPage/>}/>
@@ -44,7 +49,9 @@ export default function App() {
             <Route path="/admin/users" element={<UsersPage />} />
             <Route path="/admin/inspections-management" element={<InspectionManagementPage />} />
             <Route path="/admin/stats" element={<StatsPage />} />
+            <Route path="/admin/reports" element={<ReportsPage />} />
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/trash" element={<TrashPage />} />
           </Route>
 
 
@@ -60,5 +67,6 @@ export default function App() {
       {/* 3) Cualquier otra ruta pública redirige a login */}
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
+    </>
   )
 }
