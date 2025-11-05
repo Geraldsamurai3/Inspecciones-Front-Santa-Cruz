@@ -21,7 +21,7 @@ import {
   Home, Building2, Mountain, Anchor, Waves, Trees, Ship, Umbrella,
   Landmark, DollarSign, HardHat, Receipt, Monitor, MoreHorizontal,
   FileText, MessageSquare, Hammer, History, X, Search, Upload, AlertTriangle,
-  Plus, Trash2, ExternalLink, ImagePlus
+  Plus, Trash2, ExternalLink, ImagePlus, Ban
 } from "lucide-react";
 
 // Dominio
@@ -32,7 +32,7 @@ import { ApplicantType, District, Dependency, ConstructionProcedure } from "@/do
 /* ==========================================================================
    UI Data (labels/íconos)
    ==========================================================================*/
-const LUCIDE = { Home, Building2, Calendar, Mountain, Anchor, Waves, Trees, Ship, Umbrella, Landmark, DollarSign, HardHat, Receipt, Monitor, MoreHorizontal, MapPin, History, X, Search, Check };
+const LUCIDE = { Home, Building2, Calendar, Mountain, Anchor, Waves, Trees, Ship, Umbrella, Landmark, DollarSign, HardHat, Receipt, Monitor, MoreHorizontal, MapPin, History, X, Search, Check, Ban };
 
 const DISTRICT_OPTIONS = [
   { key: District.SantaCruz, label: "Santa Cruz", icon: "Building2" },
@@ -585,6 +585,8 @@ export default function InspectionForm() {
     pc1: null, ig1: null, ro1: null,
     mo1: null, mo2: null, mo3: null,
     zmt1: null, zmt2: null, zmt3: null,
+    wc1: null, wc2: null, wc3: null,
+    col_signature: null,
   });
   const [photoErrors, setPhotoErrors] = useState({});
 
@@ -761,37 +763,6 @@ export default function InspectionForm() {
   const removeParcel = useCallback((parcelId) => {
     setParcels(prevParcels => prevParcels.filter(parcel => parcel.id !== parcelId));
   }, []);
-
-  // 🐛 DEBUG: Función helper para logging detallado de ZMT
-  const debugZMT = useCallback((label, data) => {
-    console.group(`🔍 DEBUG ZMT: ${label}`);
-    console.log('📊 JSON Format:', JSON.stringify(data, null, 2));
-    console.log('📋 Raw Object:', data);
-    console.groupEnd();
-  }, []);
-
-  // 🐛 DEBUG: Effect para monitorear cambios en parcels
-  useEffect(() => {
-    if (parcels.length > 0) {
-      console.group('🗺️ DEBUG: Parcels State Changed');
-      console.log(`Total parcels: ${parcels.length}`);
-      console.log('Parcels JSON:', JSON.stringify(parcels, null, 2));
-      parcels.forEach((parcel, idx) => {
-        console.log(`\n📍 Parcel ${idx + 1}:`, {
-          id: parcel.id,
-          planType: parcel.planType || '❌ EMPTY',
-          planNumber: parcel.planNumber || '❌ EMPTY',
-          area: parcel.area || '❌ EMPTY',
-          mojonType: parcel.mojonType || '❌ EMPTY',
-          planComplies: parcel.planComplies,
-          respectsBoundary: parcel.respectsBoundary,
-          topography: parcel.topography || '❌ EMPTY',
-          fenceTypes: parcel.fenceTypes || '❌ EMPTY',
-        });
-      });
-      console.groupEnd();
-    }
-  }, [parcels]);
 
   useEffect(() => {
     if (!usersLoading && users.length > 0) {
@@ -1870,15 +1841,16 @@ export default function InspectionForm() {
       <CardHeader><CardTitle className="text-base">Cobros</CardTitle></CardHeader>
       <CardContent className="space-y-4">
         <div>
-          <Label>Firma del notificador *</Label>
-          <Input 
-            placeholder="URL de la firma o ruta del archivo" 
-            {...register("col_notifierSignatureUrl")}
-            aria-invalid={!!errors.col_notifierSignatureUrl && (touchedFields.col_notifierSignatureUrl || showStepErrors[4])}
+          <Label>Firma del notificador</Label>
+          <PhotoField
+            key="col_signature"
+            fieldKey="col_signature"
+            label="Firma del Notificador"
+            photos={photos}
+            setPhotos={setPhotos}
+            photoErrors={photoErrors}
+            setPhotoErrors={setPhotoErrors}
           />
-          {errors.col_notifierSignatureUrl && (touchedFields.col_notifierSignatureUrl || showStepErrors[4]) && (
-            <p className="text-sm text-red-600 mt-1">{errors.col_notifierSignatureUrl.message}</p>
-          )}
           <p className="text-xs text-gray-500 mt-1">* Requerido si no selecciona un motivo de no firma</p>
         </div>
         
@@ -2002,9 +1974,9 @@ export default function InspectionForm() {
             aria-invalid={!!errors.wc_visitNumber && (touchedFields.wc_visitNumber || showStepErrors[4])}
           >
             <option value="">Seleccione...</option>
-            <option value="Visita 1">Visita 1</option>
-            <option value="Visita 2">Visita 2</option>
-            <option value="Visita 3">Visita 3</option>
+            <option value="visita_1">Visita 1</option>
+            <option value="visita_2">Visita 2</option>
+            <option value="visita_3">Visita 3</option>
           </select>
           {errors.wc_visitNumber && (touchedFields.wc_visitNumber || showStepErrors[4]) && (
             <p className="text-sm text-red-600 mt-1">{errors.wc_visitNumber.message}</p>
@@ -2115,45 +2087,250 @@ export default function InspectionForm() {
 
       const location = { district: values.district, exactAddress: values.exactAddress };
 
-      const mayorOffice = values.dependency === Dependency.MayorOffice ? { procedureType: values.mo_procedureType, observations: values.mo_observations || null, photos: [] } : undefined;
+      // Alcaldía (Mayor Office) - Subir fotos ANTES de crear inspección
+      let mayorOffice = undefined;
+      if (values.dependency === Dependency.MayorOffice) {
+        const mayorOfficePhotoUrls = [];
+        const mayorOfficePhotoFiles = [photos.mo1, photos.mo2, photos.mo3].filter(Boolean);
+        
+        for (let i = 0; i < mayorOfficePhotoFiles.length; i++) {
+          const photoFile = mayorOfficePhotoFiles[i];
+          
+          try {
+            const formData = new FormData();
+            formData.append('file', photoFile);
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
 
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+            mayorOfficePhotoUrls.push(data.secure_url);
+          } catch (error) {
+            console.error('Error subiendo foto de Alcaldía:', error);
+          }
+        }
+
+        mayorOffice = {
+          procedureType: values.mo_procedureType,
+          observations: values.mo_observations || null,
+          photos: mayorOfficePhotoUrls.length > 0 ? mayorOfficePhotoUrls : []
+        };
+      }
+
+      // Constructions - Procesar cada tipo y subir fotos a Cloudinary ANTES
       let constructions;
       if (values.dependency === Dependency.Constructions) {
         constructions = { procedure: values.constructionProcedure, data: undefined };
+        
+        // Uso de Suelo - No tiene fotos
         if (values.constructionProcedure === ConstructionProcedure.UsoSuelo) {
-          constructions.data = { landUseRequested: values.landUseRequested, landUseMatches: !!values.landUseMatches, landUseRecommended: !!values.landUseRecommended, observations: values.landUseObservations || null };
+          constructions.data = { 
+            landUseRequested: values.landUseRequested, 
+            landUseMatches: !!values.landUseMatches, 
+            landUseRecommended: !!values.landUseRecommended, 
+            observations: values.landUseObservations || null 
+          };
         }
+        
+        // Antigüedad - Tiene 3 fotos (antiguedad1, antiguedad2, antiguedad3)
         if (values.constructionProcedure === ConstructionProcedure.Antiguedad) {
-          constructions.data = { propertyNumber: values.antiguedadNumeroFinca, estimatedAge: values.antiguedadAprox };
+          const antiquityPhotoUrls = [];
+          const antiquityPhotoFiles = [photos.antiguedad1, photos.antiguedad2, photos.antiguedad3].filter(Boolean);
+          
+          for (let i = 0; i < antiquityPhotoFiles.length; i++) {
+            const photoFile = antiquityPhotoFiles[i];
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', photoFile);
+              
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+              }
+
+              const data = await response.json();
+              if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+              antiquityPhotoUrls.push(data.secure_url);
+            } catch (error) {
+              console.error('Error subiendo foto de Antigüedad:', error);
+            }
+          }
+          
+          constructions.data = { 
+            propertyNumber: values.antiguedadNumeroFinca, 
+            estimatedAge: values.antiguedadAprox,
+            photos: antiquityPhotoUrls.length > 0 ? antiquityPhotoUrls : []
+          };
         }
+        
+        // Anulación PC - Tiene 1 foto (pc1)
         if (values.constructionProcedure === ConstructionProcedure.AnulacionPC) {
-          constructions.data = { contractNumber: values.pcNumeroContrato, pcNumber: values.pcNumero, built: !!values.pcConstruyo, observations: values.pcObservaciones || null };
+          const pcPhotoUrls = [];
+          if (photos.pc1) {
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', photos.pc1);
+              
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+              }
+
+              const data = await response.json();
+              if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+              pcPhotoUrls.push(data.secure_url);
+            } catch (error) {
+              console.error('Error subiendo foto de Anulación PC:', error);
+            }
+          }
+          
+          constructions.data = { 
+            contractNumber: values.pcNumeroContrato, 
+            pcNumber: values.pcNumero, 
+            built: !!values.pcConstruyo, 
+            observations: values.pcObservaciones || null,
+            photos: pcPhotoUrls.length > 0 ? pcPhotoUrls : []
+          };
         }
+        
+        // Inspección General - Tiene 1 foto (ig1)
         if (values.constructionProcedure === ConstructionProcedure.InspeccionGeneral) {
-          constructions.data = { propertyNumber: values.igNumeroFinca, observations: values.igObservaciones || null };
+          const igPhotoUrls = [];
+          if (photos.ig1) {
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', photos.ig1);
+              
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+              }
+
+              const data = await response.json();
+              if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+              igPhotoUrls.push(data.secure_url);
+            } catch (error) {
+              console.error('Error subiendo foto de Inspección General:', error);
+            }
+          }
+          
+          constructions.data = { 
+            propertyNumber: values.igNumeroFinca, 
+            observations: values.igObservaciones || null,
+            photos: igPhotoUrls.length > 0 ? igPhotoUrls : []
+          };
         }
+        
+        // Recibido de Obra - Tiene 1 foto (ro1)
         if (values.constructionProcedure === ConstructionProcedure.RecibidoObra) {
-          constructions.data = { visitedAt: values.roFechaVisita, status: values.roEstado };
+          const roPhotoUrls = [];
+          if (photos.ro1) {
+            
+            try {
+              const formData = new FormData();
+              formData.append('file', photos.ro1);
+              
+              const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+                method: 'POST',
+                body: formData,
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+              });
+
+              if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+              }
+
+              const data = await response.json();
+              if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+              roPhotoUrls.push(data.secure_url);
+            } catch (error) {
+              console.error('Error subiendo foto de Recibido de Obra:', error);
+            }
+          }
+          
+          constructions.data = { 
+            visitedAt: values.roFechaVisita, 
+            status: values.roEstado,
+            photos: roPhotoUrls.length > 0 ? roPhotoUrls : []
+          };
         }
       }
 
-      // 🐛 DEBUG: Estado actual de parcels antes de procesar
-      console.group('🔍 DEBUG: Parcels ANTES de crear zmtConcession');
-      console.log('📊 Parcels JSON:', JSON.stringify(parcels, null, 2));
-      console.log('� Parcels length:', parcels.length);
-      console.log('📋 Dependency value:', values.dependency);
-      console.log('📋 Is MaritimeZone?:', values.dependency === Dependency.MaritimeZone);
-      console.groupEnd();
-      
-      const zmtConcession = values.dependency === Dependency.MaritimeZone ? {
-        fileNumber: values.zc_fileNumber,
-        concessionType: values.zc_concessionType,
-        grantedAt: values.zc_grantedAt,
-        expiresAt: values.zc_expiresAt || null,
-        observations: values.zc_observations || null,
-        photos: [],
-        parcels: parcels.map((parcel, idx) => {
-          console.log(`🗺️ Processing parcel ${idx + 1}:`, parcel);
+      // ZMT Concession - Subir fotos ANTES de crear inspección
+      let zmtConcession = undefined;
+      if (values.dependency === Dependency.MaritimeZone) {
+        const zmtPhotoUrls = [];
+        const zmtPhotoFiles = [photos.zmt1, photos.zmt2, photos.zmt3].filter(Boolean);
+        
+        for (let i = 0; i < zmtPhotoFiles.length; i++) {
+          const photoFile = zmtPhotoFiles[i];
+          
+          try {
+            const formData = new FormData();
+            formData.append('file', photoFile);
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+            zmtPhotoUrls.push(data.secure_url);
+          } catch (error) {
+            console.error('Error subiendo foto de ZMT:', error);
+          }
+        }
+
+        zmtConcession = {
+          fileNumber: values.zc_fileNumber,
+          concessionType: values.zc_concessionType,
+          grantedAt: values.zc_grantedAt,
+          expiresAt: values.zc_expiresAt || null,
+          observations: values.zc_observations || null,
+          photos: zmtPhotoUrls.length > 0 ? zmtPhotoUrls : [],
+          parcels: parcels.map((parcel) => {
           return {
             planType: parcel.planType,
             planNumber: parcel.planNumber,
@@ -2172,57 +2349,48 @@ export default function InspectionForm() {
             roadMatchesPlan: parcel.roadMatchesPlan,
             rightOfWayWidth: parcel.rightOfWayWidth || null,
           };
-        }),
-      } : undefined;
-      
-      // 🐛 DEBUG: ZMT Concession completo con formato JSON
-      if (zmtConcession) {
-        console.group('🏝️ DEBUG: ZMT Concession CREADO');
-        console.log('📊 ZMT Concession JSON (COMPLETO):', JSON.stringify(zmtConcession, null, 2));
-        console.log('� Concession Info:', {
-          fileNumber: zmtConcession.fileNumber,
-          concessionType: zmtConcession.concessionType,
-          grantedAt: zmtConcession.grantedAt,
-          expiresAt: zmtConcession.expiresAt,
-          observations: zmtConcession.observations,
-          totalParcels: zmtConcession.parcels.length
-        });
-        
-        console.log('\n📦 Parcels Array (Formato que se enviará al backend):');
-        console.log(JSON.stringify(zmtConcession.parcels, null, 2));
-        
-        zmtConcession.parcels.forEach((p, i) => {
-          console.group(`\n📍 Parcel ${i + 1} Detalle:`);
-          console.log('JSON:', JSON.stringify(p, null, 2));
-          console.log('Validación:', {
-            planType: p.planType ? '✅' : '❌ FALTA',
-            planNumber: p.planNumber ? '✅' : '❌ FALTA',
-            area: p.area ? '✅' : '❌ FALTA',
-            mojonType: p.mojonType ? '✅' : '❌ FALTA',
-            topography: p.topography ? '✅' : '❌ FALTA',
-            hasAllRequired: !!(p.planType && p.planNumber && p.area && p.mojonType && p.topography)
-          });
-          console.groupEnd();
-        });
-        console.groupEnd();
-      } else {
-        console.group('⚠️ DEBUG: ZMT Concession NO CREADO');
-        console.log('Dependency actual:', values.dependency);
-        console.log('Dependency.MaritimeZone:', Dependency.MaritimeZone);
-        console.log('¿Son iguales?:', values.dependency === Dependency.MaritimeZone);
-        console.groupEnd();
+        })
+        };
       }
 
       // Parse and normalize userIds
       // Plataformas de Servicios
-      const servicePlatform = values.dependency === Dependency.ServicePlatform ? {
+      const platformAndService = values.dependency === Dependency.ServicePlatform ? {
         procedureNumber: values.ps_procedureNumber,
         observation: values.ps_observation || null,
       } : undefined;
 
+      // Subir firma del notificador a Cloudinary si existe
+      let signatureUrl = null;
+      if (values.dependency === Dependency.Collections && photos.col_signature) {
+        try {
+          // Usar la función de Cloudinary para subir
+          const formData = new FormData();
+          formData.append('file', photos.col_signature);
+          
+          const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+            method: 'POST',
+            body: formData,
+            headers: {
+              'Authorization': `Bearer ${localStorage.getItem('token')}`
+            }
+          });
+
+          if (!response.ok) {
+            throw new Error('Failed to upload signature');
+          }
+
+          const data = await response.json();
+          signatureUrl = data.secure_url;
+        } catch (error) {
+          console.error('Error uploading signature:', error);
+          throw new Error('Error al subir la firma del notificador');
+        }
+      }
+
       // Cobros (Collections)
       const collection = values.dependency === Dependency.Collections ? {
-        notifierSignatureUrl: values.col_notifierSignatureUrl || null,
+        notifierSignatureUrl: signatureUrl || null,
         nobodyPresent: values.col_nobodyPresent ? 'X' : null,
         wrongAddress: values.col_wrongAddress ? 'X' : null,
         movedAddress: values.col_movedAddress ? 'X' : null,
@@ -2231,20 +2399,54 @@ export default function InspectionForm() {
         other: values.col_other || null,
       } : undefined;
 
-      // Clausura de Obra (Work Closure)
-      const workClosure = values.dependency === Dependency.WorkClosure ? {
-        propertyNumber: values.wc_propertyNumber || null,
-        cadastralNumber: values.wc_cadastralNumber || null,
-        contractNumber: values.wc_contractNumber || null,
-        permitNumber: values.wc_permitNumber || null,
-        assessedArea: values.wc_assessedArea || null,
-        builtArea: values.wc_builtArea || null,
-        visitNumber: values.wc_visitNumber || null,
-        workReceipt: !!values.wc_workReceipt,
-        actions: values.wc_actions || null,
-        observations: values.wc_observations || null,
-        photoUrls: [],
-      } : undefined;
+      // Clausura de Obra (Work Closure) - Subir fotos ANTES de crear inspección
+      let workClosure = undefined;
+      if (values.dependency === Dependency.WorkClosure) {
+        const workClosurePhotoUrls = [];
+        const workClosurePhotoFiles = [photos.wc1, photos.wc2, photos.wc3].filter(Boolean);
+        
+        for (let i = 0; i < workClosurePhotoFiles.length; i++) {
+          const photoFile = workClosurePhotoFiles[i];
+          
+          try {
+            const formData = new FormData();
+            formData.append('file', photoFile);
+            
+            const response = await fetch(`${import.meta.env.VITE_API_URL}/cloudinary/upload`, {
+              method: 'POST',
+              body: formData,
+              headers: {
+                'Authorization': `Bearer ${localStorage.getItem('token')}`
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              throw new Error(`Failed to upload photo: ${response.status} - ${errorText}`);
+            }
+
+            const data = await response.json();
+            if (!data.secure_url) throw new Error('Cloudinary no devolvió secure_url');
+            workClosurePhotoUrls.push(data.secure_url);
+          } catch (error) {
+            console.error('Error subiendo foto de Work Closure:', error);
+          }
+        }
+
+        workClosure = {
+          propertyNumber: values.wc_propertyNumber || null,
+          cadastralNumber: values.wc_cadastralNumber || null,
+          contractNumber: values.wc_contractNumber || null,
+          permitNumber: values.wc_permitNumber || null,
+          assessedArea: values.wc_assessedArea || null,
+          builtArea: values.wc_builtArea || null,
+          visitNumber: values.wc_visitNumber || null,
+          workReceipt: !!values.wc_workReceipt,
+          actions: values.wc_actions || null,
+          observations: values.wc_observations || null,
+          photos: workClosurePhotoUrls.length > 0 ? workClosurePhotoUrls : null
+        };
+      }
 
       const parsedUserIds = (() => {
         try {
@@ -2269,54 +2471,12 @@ export default function InspectionForm() {
         mayorOffice,
         constructions,
         zmtConcession,
-        servicePlatform,
+        platformAndService,
         collection,
         workClosure,
       };
 
-      console.log('� Payload to send:', payload);
-      console.log('📋 Dependency value:', values.dependency);
-      console.log('�📷 Current photos state:', photos);
-      
-      // 🐛 DEBUG: Payload FINAL JSON detallado
-      console.group('========== DEBUG: PAYLOAD FINAL COMPLETO ==========');
-      console.log('PAYLOAD JSON:');
-      console.log(JSON.stringify(payload, null, 2));
-      
-      if (payload.zmtConcession) {
-        console.group('ZMT CONCESSION EN PAYLOAD:');
-        console.log('ZMT JSON:', JSON.stringify(payload.zmtConcession, null, 2));
-        console.log('Parcels count:', payload.zmtConcession.parcels?.length || 0);
-        
-        if (payload.zmtConcession.parcels && payload.zmtConcession.parcels.length > 0) {
-          console.log('PARCELS ARRAY (Formato Backend):');
-          console.log(JSON.stringify(payload.zmtConcession.parcels, null, 2));
-        }
-        console.groupEnd();
-      } else {
-        console.warn('zmtConcession NO esta en payload');
-      }
-      console.groupEnd();
-      
-      const photosBySection = {
-        antiguedadPhotos: [photos.antiguedad1, photos.antiguedad2, photos.antiguedad3].filter(Boolean),
-        pcCancellationPhotos: [photos.pc1].filter(Boolean),
-        generalInspectionPhotos: [photos.ig1].filter(Boolean),
-        workReceiptPhotos: [photos.ro1].filter(Boolean),
-        mayorOfficePhotos: [photos.mo1, photos.mo2, photos.mo3].filter(Boolean),
-        zmtConcessionPhotos: [photos.zmt1, photos.zmt2, photos.zmt3].filter(Boolean),
-        workClosurePhotos: [photos.wc1, photos.wc2, photos.wc3].filter(Boolean),
-      };
-
-      console.log('📸 Photos organized by section:', {
-        antiguedadPhotos: photosBySection.antiguedadPhotos.length,
-        pcCancellationPhotos: photosBySection.pcCancellationPhotos.length,
-        generalInspectionPhotos: photosBySection.generalInspectionPhotos.length,
-        workReceiptPhotos: photosBySection.workReceiptPhotos.length,
-        mayorOfficePhotos: photosBySection.mayorOfficePhotos.length,
-        zmtConcessionPhotos: photosBySection.zmtConcessionPhotos.length,
-      });
-
+      const photosBySection = {};
       const created = await createInspectionFromForm(payload, photosBySection);
       // Reset form
       reset({
@@ -2360,6 +2520,8 @@ export default function InspectionForm() {
         pc1: null, ig1: null, ro1: null,
         mo1: null, mo2: null, mo3: null,
         zmt1: null, zmt2: null, zmt3: null,
+        wc1: null, wc2: null, wc3: null,
+        col_signature: null,
       });
       setPhotoErrors({});
       setParcels([{ ...emptyParcel }]);

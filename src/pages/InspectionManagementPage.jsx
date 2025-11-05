@@ -24,7 +24,9 @@ import {
   TrendingUp,
   AlertTriangle,
   Users,
-  BarChart3
+  BarChart3,
+  Monitor,
+  Ban
 } from 'lucide-react';
 
 // shadcn/ui components
@@ -162,11 +164,11 @@ const dependencyConfig = {
     icon: FileText
   },
   'ServicePlatform': {
-    borderColor: '#d946ef', // fuchsia-500
-    bgColor: '#fdf4ff', // fuchsia-50
-    badgeStyle: { backgroundColor: '#fae8ff', color: '#86198f', border: '1px solid #f5d0fe' },
+    borderColor: '#8b5cf6', // violet-500
+    bgColor: '#f5f3ff', // violet-50
+    badgeStyle: { backgroundColor: '#ede9fe', color: '#5b21b6', border: '1px solid #c4b5fd' },
     label: 'Plataforma de Servicios',
-    icon: Building
+    icon: Monitor
   },
   'MaritimeZone': {
     borderColor: '#06b6d4', // cyan-500
@@ -174,6 +176,13 @@ const dependencyConfig = {
     badgeStyle: { backgroundColor: '#cffafe', color: '#155e75', border: '1px solid #a5f3fc' },
     label: 'Zona Marítima',
     icon: MapPin
+  },
+  'WorkClosure': {
+    borderColor: '#dc2626', // red-600
+    bgColor: '#fef2f2', // red-50
+    badgeStyle: { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fecaca' },
+    label: 'Clausura de Obra',
+    icon: Ban
   }
 };
 
@@ -651,6 +660,99 @@ const InspectionDetailModal = ({ inspection, isOpen, onClose, onStatusChange, on
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Plataforma de Servicios */}
+          {inspection.platformAndService && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Detalles - Plataforma de Servicios</label>
+              <div className="bg-purple-50 p-4 rounded-lg space-y-2">
+                <p><span className="font-medium">Número de Trámite:</span> {inspection.platformAndService.procedureNumber}</p>
+                {inspection.platformAndService.observation && (
+                  <p><span className="font-medium">Observación:</span> {inspection.platformAndService.observation}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cobros (Collections) */}
+          {inspection.collection && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Detalles - Cobros</label>
+              <div className="bg-green-50 p-4 rounded-lg space-y-2">
+                {inspection.collection.notifierSignatureUrl && (
+                  <div>
+                    <p className="font-medium mb-2">Firma del Notificador:</p>
+                    <img 
+                      src={inspection.collection.notifierSignatureUrl} 
+                      alt="Firma del notificador" 
+                      className="max-w-xs border rounded"
+                    />
+                  </div>
+                )}
+                
+                <div className="mt-3">
+                  <p className="font-medium mb-2">Motivos de no firma:</p>
+                  <ul className="list-disc list-inside space-y-1 text-sm">
+                    {inspection.collection.nobodyPresent && <li>No había nadie</li>}
+                    {inspection.collection.wrongAddress && <li>Dirección incorrecta</li>}
+                    {inspection.collection.movedAddress && <li>Cambió domicilio</li>}
+                    {inspection.collection.refusedToSign && <li>No quiso firmar</li>}
+                    {inspection.collection.notLocated && <li>No se localiza</li>}
+                  </ul>
+                </div>
+                
+                {inspection.collection.other && (
+                  <p><span className="font-medium">Otro motivo:</span> {inspection.collection.other}</p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Clausura de Obra */}
+          {inspection.workClosure && (
+            <div>
+              <label className="text-sm font-medium text-gray-500">Detalles - Clausura de Obra</label>
+              <div className="bg-red-50 p-4 rounded-lg space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                  {inspection.workClosure.propertyNumber && (
+                    <p><span className="font-medium">Número de Finca:</span> {inspection.workClosure.propertyNumber}</p>
+                  )}
+                  {inspection.workClosure.cadastralNumber && (
+                    <p><span className="font-medium">Número Catastral:</span> {inspection.workClosure.cadastralNumber}</p>
+                  )}
+                  {inspection.workClosure.contractNumber && (
+                    <p><span className="font-medium">No. de Contrato:</span> {inspection.workClosure.contractNumber}</p>
+                  )}
+                  {inspection.workClosure.permitNumber && (
+                    <p><span className="font-medium">Número de Permiso:</span> {inspection.workClosure.permitNumber}</p>
+                  )}
+                  {inspection.workClosure.assessedArea && (
+                    <p><span className="font-medium">Área Tasada:</span> {inspection.workClosure.assessedArea}</p>
+                  )}
+                  {inspection.workClosure.builtArea && (
+                    <p><span className="font-medium">Área Construida:</span> {inspection.workClosure.builtArea}</p>
+                  )}
+                  {inspection.workClosure.visitNumber && (
+                    <p><span className="font-medium">Número de Visita:</span> {inspection.workClosure.visitNumber}</p>
+                  )}
+                  <p><span className="font-medium">Recibo de Obra:</span> {inspection.workClosure.workReceipt ? 'Sí' : 'No'}</p>
+                </div>
+                
+                {inspection.workClosure.actions && (
+                  <p><span className="font-medium">Acciones:</span> {inspection.workClosure.actions}</p>
+                )}
+                
+                {inspection.workClosure.observations && (
+                  <p><span className="font-medium">Observaciones:</span> {inspection.workClosure.observations}</p>
+                )}
+                
+                {/* Fotos de clausura */}
+                {inspection.workClosure.photos && inspection.workClosure.photos.length > 0 && (
+                  <PhotoGallery photos={inspection.workClosure.photos} title="Fotos de la clausura" />
                 )}
               </div>
             </div>
@@ -1223,12 +1325,14 @@ export default function InspectionManagementPage() {
               dependencyKey = 'MaritimeZone';
             } else if (inspection.realEstate) {
               dependencyKey = 'RealEstate';
-            } else if (inspection.collections) {
+            } else if (inspection.collection) {
               dependencyKey = 'Collections';
             } else if (inspection.taxesAndLicenses) {
               dependencyKey = 'TaxesAndLicenses';
-            } else if (inspection.servicePlatform) {
+            } else if (inspection.platformAndService) {
               dependencyKey = 'ServicePlatform';
+            } else if (inspection.workClosure) {
+              dependencyKey = 'WorkClosure';
             }
           }
           

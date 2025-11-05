@@ -54,56 +54,11 @@ export function useInspections({ autoFetch = true, initialParams = {} } = {}) {
 
   const createInspectionFromForm = useCallback(async (formValues, photosBySection = {}) => {
     const dto = mapInspectionDto(formValues);
-    console.log('📤 Creating inspection with DTO:', dto);
     const created = await inspectionsService.createInspection(dto);
 
     if (!created || !created.id) {
       throw new Error('Inspection creation failed');
     }
-
-    console.log('✅ Inspection created with ID:', created.id);
-    console.log('📸 Photos to upload by section:', photosBySection);
-
-    const uploads = [];
-    if (photosBySection.mayorOfficePhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.mayorOfficePhotos.length} Mayor Office photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.mayorOfficePhotos, { section: 'mayorOfficePhotos' }));
-    }
-    if (photosBySection.antiguedadPhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.antiguedadPhotos.length} Antiquity photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.antiguedadPhotos, { section: 'antiquityPhotos' }));
-    }
-    if (photosBySection.pcCancellationPhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.pcCancellationPhotos.length} PC Cancellation photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.pcCancellationPhotos, { section: 'pcCancellationPhotos' }));
-    }
-    if (photosBySection.generalInspectionPhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.generalInspectionPhotos.length} General Inspection photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.generalInspectionPhotos, { section: 'generalInspectionPhotos' }));
-    }
-    if (photosBySection.workReceiptPhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.workReceiptPhotos.length} Work Receipt photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.workReceiptPhotos, { section: 'workReceiptPhotos' }));
-    }
-    if (photosBySection.zmtConcessionPhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.zmtConcessionPhotos.length} ZMT Concession photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.zmtConcessionPhotos, { section: 'zmtConcessionPhotos' }));
-    }
-    if (photosBySection.workClosurePhotos?.length) {
-      console.log(`📸 Uploading ${photosBySection.workClosurePhotos.length} Work Closure photos`);
-      uploads.push(inspectionsService.uploadPhotos(created.id, photosBySection.workClosurePhotos, { section: 'workClosurePhotos' }));
-    }
-    
-    console.log(`📤 Total upload requests: ${uploads.length}`);
-    const results = await Promise.allSettled(uploads);
-    
-    results.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        console.log(`✅ Upload ${index + 1} successful:`, result.value);
-      } else {
-        console.error(`❌ Upload ${index + 1} failed:`, result.reason);
-      }
-    });
 
     await fetchInspections(initialParamsRef.current);
     return created;

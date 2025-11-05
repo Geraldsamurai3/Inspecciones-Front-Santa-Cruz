@@ -44,7 +44,7 @@ export const ConstructionProcedure = Object.freeze({
 });
 
 export const VisitNumber = Object.freeze({
-  Visit1: "Visita 1",
-  Visit2: "Visita 2",
-  Visit3: "Visita 3",
+  VISIT_1: "visita_1",
+  VISIT_2: "visita_2",
+  VISIT_3: "visita_3",
 });

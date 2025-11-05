@@ -63,11 +63,11 @@ export const inspectionsService = {
   moveToTrash: (id) => request(`/inspections/${id}/trash`, { method: 'PATCH' }),
   restoreFromTrash: (id) => request(`/inspections/${id}/restore`, { method: 'PATCH' }),
 
-  uploadPhotos: async (inspectionId, files = [], { section = 'general' } = {}) => {
+  uploadPhotos: async (inspectionId, files = []) => {
     if (!files || files.length === 0) return null;
     const form = new FormData();
     files.forEach(f => form.append('files', f));
-    return request(`/inspections/${inspectionId}/photos?section=${section}`, {
+    return request(`/inspections/${inspectionId}/photos`, {
       method: 'POST',
       body: form,
       rawBody: true,

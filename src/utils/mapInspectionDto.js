@@ -90,6 +90,7 @@ export function mapInspectionDto(values = {}) {
     dto.mayorOffice = {
       procedureType: nullIfEmpty(mayorOffice.procedureType),
       observations: nullIfEmpty(mayorOffice.observations),
+      photos: mayorOffice.photos || [], // URLs de Cloudinary
     };
   }
 
@@ -110,6 +111,7 @@ export function mapInspectionDto(values = {}) {
       dto.antiquity = {
         propertyNumber: nullIfEmpty(data.propertyNumber),
         estimatedAntiquity: nullIfEmpty(data.estimatedAge),
+        photos: data.photos || [], // URLs de Cloudinary
       };
     }
     
@@ -119,6 +121,7 @@ export function mapInspectionDto(values = {}) {
         pcNumber: nullIfEmpty(data.pcNumber),
         wasBuilt: data.built, // Backend espera 'wasBuilt' no 'built'
         observations: nullIfEmpty(data.observations),
+        photos: data.photos || [], // URLs de Cloudinary
       };
     }
     
@@ -126,6 +129,7 @@ export function mapInspectionDto(values = {}) {
       dto.generalInspection = {
         propertyNumber: nullIfEmpty(data.propertyNumber),
         observations: nullIfEmpty(data.observations),
+        photos: data.photos || [], // URLs de Cloudinary
       };
     }
     
@@ -133,21 +137,16 @@ export function mapInspectionDto(values = {}) {
       dto.workReceipt = {
         visitDate: data.visitedAt,
         state: data.status,
+        photos: data.photos || [], // URLs de Cloudinary
       };
     }
   }
 
   // Maritime Zone Concession
   if (dependency === "MaritimeZone" && zmtConcession) {
-    console.log('🏝️ Processing ZMT Concession:', zmtConcession);
-    
-    // Map parcels PRIMERO
     let mappedParcels = [];
     if (zmtConcession.parcels && zmtConcession.parcels.length > 0) {
-      console.log('🗺️ Mapping ZMT parcels:', zmtConcession.parcels);
-      
-      mappedParcels = zmtConcession.parcels.map((p, index) => {
-        console.log(`📍 Parcel ${index + 1}:`, p);
+      mappedParcels = zmtConcession.parcels.map((p) => {
         
         // Normalizar booleanos (pueden venir como string "si"/"no" o boolean true/false)
         const normalizeBoolean = (value) => {
@@ -185,13 +184,8 @@ export function mapInspectionDto(values = {}) {
           rightOfWayWidth: nullIfEmpty(p.rightOfWayWidth),
         };
         
-        console.log(`✅ Mapped parcel ${index + 1}:`, mappedParcel);
         return mappedParcel;
       });
-      
-      console.log(`📦 Total parcels mapped: ${mappedParcels.length}`);
-    } else {
-      console.warn('⚠️ No parcels found in zmtConcession or parcels array is empty');
     }
     
     // Crear concession SIN parcels (el backend los espera por separado en la creación)
@@ -201,24 +195,21 @@ export function mapInspectionDto(values = {}) {
       grantedAt: zmtConcession.grantedAt,
       expiresAt: zmtConcession.expiresAt || null,
       observations: zmtConcession.observations || "", // Backend requires string, not null
+      photos: zmtConcession.photos || [], // URLs de Cloudinary
     };
     
     // Enviar parcels como array separado (aunque el backend los devuelva dentro de concession)
     if (mappedParcels.length > 0) {
       dto.concessionParcels = mappedParcels;
     }
-    
-    console.log('✅ Final concession DTO (without parcels):', JSON.stringify(dto.concession, null, 2));
-    console.log('✅ Parcels as separate array:', JSON.stringify(dto.concessionParcels, null, 2));
-    console.log('✅ Parcels count:', mappedParcels.length);
   }
 
-  // Service Platform
-  if (dependency === "ServicePlatform" && values.servicePlatform) {
-    const sp = values.servicePlatform;
-    dto.servicePlatform = {
-      procedureNumber: sp.procedureNumber || "",
-      observation: nullIfEmpty(sp.observation),
+  // Service Platform (usando el nombre correcto del backend: platformAndService)
+  if (dependency === "ServicePlatform" && values.platformAndService) {
+    const pas = values.platformAndService;
+    dto.platformAndService = {
+      procedureNumber: pas.procedureNumber || "",
+      observation: nullIfEmpty(pas.observation),
     };
   }
 
@@ -250,13 +241,9 @@ export function mapInspectionDto(values = {}) {
       workReceipt: !!wc.workReceipt,
       actions: nullIfEmpty(wc.actions),
       observations: nullIfEmpty(wc.observations),
-      photoUrls: wc.photoUrls || [],
+      photos: wc.photos || [], // URLs de Cloudinary (corregido de photoUrls a photos)
     };
   }
 
-  console.log('📦 DTO before cleanEmpty:', dto);
-  const cleaned = cleanEmpty(dto);
-  console.log('📦 DTO after cleanEmpty:', cleaned);
-  
-  return cleaned || {};
+  return cleanEmpty(dto) || {};
 }

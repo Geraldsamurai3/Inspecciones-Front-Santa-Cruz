@@ -11,7 +11,7 @@ class StatsService {
   // Helper para hacer requests con manejo de errores
   async request(endpoint, options = {}) {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('token');
       const response = await fetch(`${this.baseURL}${endpoint}`, {
         headers: {
           'Content-Type': 'application/json',

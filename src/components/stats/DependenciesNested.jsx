@@ -274,6 +274,15 @@ export default function DependenciesNested() {
                   <td className="px-4 py-3"></td>
                 </tr>
               )}
+
+              {deps.clausuraObra && (
+                <tr className="hover:bg-gray-50">
+                  <td className="px-4 py-3 font-medium text-gray-900">🛡️ Clausura de Obra</td>
+                  <td className="px-4 py-3 text-center font-bold">{deps.clausuraObra.total}</td>
+                  <td className="px-4 py-3 text-center">{deps.clausuraObra.porcentaje}%</td>
+                  <td className="px-4 py-3"></td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

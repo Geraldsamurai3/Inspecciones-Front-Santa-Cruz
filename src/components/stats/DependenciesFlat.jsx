@@ -18,7 +18,8 @@ import {
   Search,
   FileCheck,
   AlertCircle,
-  RefreshCw
+  RefreshCw,
+  ShieldAlert
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts';
 import axiosInstance from '../../config/axiosConfig';
@@ -39,7 +40,8 @@ const dependencyIcons = {
   'Impuestos y Licencias': <Store className="w-5 h-5" />,
   'Plataforma de Servicios': <Building className="w-5 h-5" />,
   'Zona Marítima': <Waves className="w-5 h-5" />,
-  'Cierre de Obra': <Lock className="w-5 h-5" />
+  'Cierre de Obra': <Lock className="w-5 h-5" />,
+  'Clausura de Obra': <ShieldAlert className="w-5 h-5" />
 };
 
 // Colores para el gráfico
@@ -65,7 +67,8 @@ const getDependencyColor = (nombre, esSubdependencia) => {
     'Impuestos y Licencias': '#F59E0B',
     'Plataforma de Servicios': '#14B8A6',
     'Zona Marítima': '#06B6D4',
-    'Cierre de Obra': '#6366F1'
+    'Cierre de Obra': '#6366F1',
+    'Clausura de Obra': '#DC2626'
   };
   return colors[nombre] || '#6B7280';
 };
