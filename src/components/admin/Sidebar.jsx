@@ -61,7 +61,6 @@ export default function Sidebar() {
     { to: '/admin/stats', label: 'Estadísticas', icon: <BarChart3 size={20}/>, roles: ['admin'] },
     { to: '/admin/reports', label: 'Reportes', icon: <FileText size={20}/>, roles: ['admin'] },
     { to: '/admin/users', label: 'Usuarios', icon: <Users size={20}/>, roles: ['admin'] },
-    { to: '/admin/settings', label: 'Ajustes', icon: <Settings size={20}/>, roles: ['admin'] },
   ]
   const menuItems = allItems.filter(item => {
     // Verificar si el rol del usuario está en los roles permitidos del item
